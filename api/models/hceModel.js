@@ -1,126 +1,145 @@
-// Importar el pool de conexión a la base de datos
 const db = require('../../server/db_connection');
+const Joi = require('joi');
+const pacienteModel = require('./pacienteModel');
 
-// Define el modelo para la entidad de historia clínica electrónica (HCE)
-const hceModel = function (hce) {
-  this.NHC_paciente = hce.NHC_paciente;
-  this.sexo = hce.sexo;
-  this.grupo_sanguineo = hce.grupo_sanguineo;
-  this.alergias = hce.alergias;
-  this.antecedentes_clinicos = hce.antecedentes_clinicos;
-};
+// Esquema de validación para la creación de una HCE
+const hceSchema = Joi.object({
+  NHC_paciente: Joi.number().integer().required(),
+  sexo: Joi.string().valid('F', 'M').max(10).allow(null, ''),
+  grupo_sanguineo: Joi.string().max(10).allow(null, ''),
+  alergias: Joi.string().allow(null, ''),
+  antecedentes_clinicos: Joi.string().allow(null, ''),
+});
 
-// Crea una nueva HCE
-hceModel.create = (nuevaHce, resultado) => {
-  db.query('INSERT INTO hce SET ?', nuevaHce, (err, res) => {
-    if (err) {
-      console.error('Error al crear la HCE:', err);
-      resultado(
-        { error: 'Error al crear HCE', detalles: err.sqlMessage },
-        null
+const hceSchemaUpdate = Joi.object({
+  sexo: Joi.string().valid('F', 'M').max(10).allow(null, '').optional(),
+  grupo_sanguineo: Joi.string().max(10).allow(null, '').optional(),
+  alergias: Joi.string().allow(null, '').optional(),
+  antecedentes_clinicos: Joi.string().allow(null, '').optional(),
+}).min(1); // Asegura que al menos un campo sea proporcionado para la actualización.
+
+const hceModel = {
+  /**
+   * Este método crea una nueva Historia Clínica Electrónica (HCE) en la base de datos.
+   * Primero verifica que el paciente asociado exista y luego valida los datos de entrada con hceSchema
+   * antes de la inserción para asegurar que todos los campos requeridos estén presentes y sean válidos.
+   * En caso de error de validación o inserción, lanza una excepción con el mensaje de error correspondiente.
+   */
+  async create(newHCE) {
+    // Validar la existencia del paciente asociado
+    try {
+      await pacienteModel.findByNhc(newHCE.NHC_paciente);
+    } catch (err) {
+      throw new Error(
+        `No existe un paciente con el NHC ${newHCE.NHC_paciente}: ${err.message}`
       );
-      return;
     }
-    resultado(null, { NHC_paciente: res.insertId, ...nuevaHce });
-  });
-};
 
-// Obtiene todas las HCEs
-hceModel.getAll = (resultado) => {
-  db.query('SELECT * FROM hce', (err, res) => {
-    if (err) {
-      console.error('Error al obtener las HCEs:', err);
-      resultado(
-        { error: 'Error al obtener HCEs', detalles: err.sqlMessage },
-        null
+    const { error, value } = hceSchema.validate(newHCE);
+    if (error) {
+      throw new Error(
+        `Validación fallida: ${error.details.map((x) => x.message).join(', ')}`
       );
-      return;
     }
-    resultado(null, res);
-  });
-};
 
-// Obtiene una HCE por el NHC del paciente
-hceModel.findByNHC = (NHC_paciente, resultado) => {
-  db.query(
-    'SELECT * FROM hce WHERE NHC_paciente = ?',
-    [NHC_paciente],
-    (err, res) => {
-      if (err) {
-        console.error('Error al buscar la HCE:', err);
-        resultado(
-          { error: 'Error al buscar HCE', detalles: err.sqlMessage },
-          null
+    try {
+      await db.query('INSERT INTO hce SET ?', value);
+      return { ...value };
+    } catch (err) {
+      throw new Error(`Error al crear la HCE: ${err.message}`);
+    }
+  },
+
+  /**
+   * Este método obtiene todas las Historias Clínicas Electrónicas (HCEs) de la base de datos.
+   * Este método no requiere validación de entrada.
+   * En caso de éxito, devuelve un arreglo de todas las HCEs encontradas.
+   * En caso de error durante la consulta, lanza una excepción con el mensaje de error correspondiente.
+   */
+  async getAll() {
+    try {
+      const [res] = await db.query('SELECT * FROM hce');
+      return res;
+    } catch (err) {
+      throw new Error(`Error al obtener todas las HCEs: ${err.message}`);
+    }
+  },
+
+  /**
+   * Este método obtiene la Historia Clínica Electrónica (HCE) de un paciente específico por su NHC.
+   * Valida que el NHC sea un número entero válido antes de realizar la consulta.
+   * En caso de no encontrar la HCE, lanza un error especificando que la HCE no fue encontrada.
+   */
+  async findByPacienteNHC(NHC_paciente) {
+    const { error } = Joi.number().integer().required().validate(NHC_paciente);
+    if (error) throw new Error('El NHC proporcionado es inválido.');
+
+    try {
+      const [result] = await db.query(
+        'SELECT * FROM hce WHERE NHC_paciente = ?',
+        [NHC_paciente]
+      );
+      if (result.length === 0)
+        throw new Error(
+          'HCE no encontrada para el paciente con el NHC proporcionado'
         );
-        return;
-      }
-      if (res.length) {
-        resultado(null, res[0]);
-      } else {
-        resultado({ tipo: 'HCE no encontrada' }, null);
-      }
+      return result[0];
+    } catch (err) {
+      throw new Error(`Error al buscar la HCE: ${err.message}`);
     }
-  );
-};
+  },
 
-// Actualiza una HCE por el NHC del paciente
-hceModel.updateByNHC = (NHC_paciente, hce, resultado) => {
-  const updateFields = {};
-  if ('sexo' in hce) updateFields.sexo = hce.sexo;
-  if ('grupo_sanguineo' in hce)
-    updateFields.grupo_sanguineo = hce.grupo_sanguineo;
-  if ('alergias' in hce) updateFields.alergias = hce.alergias;
-  if ('antecedentes_clinicos' in hce)
-    updateFields.antecedentes_clinicos = hce.antecedentes_clinicos;
+  /**
+   * Actualiza la Historia Clínica Electrónica (HCE) de un paciente específico por su NHC con los datos proporcionados.
+   * Antes de la actualización, valida los datos utilizando `hceSchema`.
+   * Si no se encuentran cambios o el paciente no existe, lanza un error.
+   */
+  async updateByPacienteNHC(NHC_paciente, datosHCE) {
+    const { error, value } = hceSchema.validate(datosHCE);
+    if (error) {
+      throw new Error(
+        `Validación fallida: ${error.details.map((x) => x.message).join(', ')}`
+      );
+    }
 
-  if (Object.keys(updateFields).length === 0) {
-    resultado({ tipo: 'Nada que actualizar' }, null);
-    return;
-  }
-
-  db.query(
-    'UPDATE hce SET ? WHERE NHC_paciente = ?',
-    [updateFields, NHC_paciente],
-    (err, res) => {
-      if (err) {
-        console.error('Error al actualizar la HCE:', err);
-        resultado(
-          { error: 'Error al actualizar HCE', detalles: err.sqlMessage },
-          null
+    try {
+      const [result] = await db.query(
+        'UPDATE hce SET ? WHERE NHC_paciente = ?',
+        [value, NHC_paciente]
+      );
+      if (result.affectedRows === 0)
+        throw new Error(
+          'HCE no encontrada o sin cambios necesarios para el paciente con el NHC proporcionado'
         );
-        return;
-      }
-      if (res.affectedRows === 0) {
-        resultado({ tipo: 'HCE no encontrada' }, null);
-      } else {
-        resultado(null, { NHC_paciente, ...updateFields });
-      }
+      return { NHC_paciente, ...value };
+    } catch (err) {
+      throw new Error(`Error al actualizar la HCE: ${err.message}`);
     }
-  );
-};
+  },
 
-// Elimina una HCE por el NHC del paciente
-hceModel.removeByNHC = (NHC_paciente, resultado) => {
-  db.query(
-    'DELETE FROM hce WHERE NHC_paciente = ?',
-    [NHC_paciente],
-    (err, res) => {
-      if (err) {
-        console.error('Error al eliminar la HCE:', err);
-        resultado(
-          { error: 'Error al eliminar HCE', detalles: err.sqlMessage },
-          null
+  /**
+   * Elimina la Historia Clínica Electrónica (HCE) de un paciente específico por su NHC.
+   * Valida que el NHC sea un número entero válido antes de ejecutar la eliminación.
+   * Si la HCE no existe, lanza un error indicando que no se encontró.
+   */
+  async removeByPacienteNHC(NHC_paciente) {
+    const { error } = Joi.number().integer().required().validate(NHC_paciente);
+    if (error) throw new Error('El NHC proporcionado es inválido.');
+
+    try {
+      const [result] = await db.query(
+        'DELETE FROM hce WHERE NHC_paciente = ?',
+        [NHC_paciente]
+      );
+      if (result.affectedRows === 0)
+        throw new Error(
+          'HCE no encontrada para el paciente con el NHC proporcionado'
         );
-        return;
-      }
-      if (res.affectedRows === 0) {
-        resultado({ tipo: 'HCE no encontrada' }, null);
-      } else {
-        resultado(null, res);
-      }
+      return { mensaje: 'HCE eliminada exitosamente.' };
+    } catch (err) {
+      throw new Error(`Error al eliminar la HCE: ${err.message}`);
     }
-  );
+  },
 };
 
-// Exportar el modelo
 module.exports = hceModel;

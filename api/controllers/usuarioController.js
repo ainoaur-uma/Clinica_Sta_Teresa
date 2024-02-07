@@ -11,9 +11,10 @@ const usuarioController = {
    */
   async create(req, res) {
     try {
-      const { nombre_usuario, contrasena, rol_usuario } = req.body;
+      const { idUsuario, nombre_usuario, contrasena, rol_usuario } = req.body;
       const hashedPassword = await bcrypt.hash(contrasena, saltRounds);
       const nuevoUsuario = {
+        idUsuario,
         nombre_usuario,
         contrasena: hashedPassword,
         rol_usuario,
@@ -126,16 +127,21 @@ const usuarioController = {
 
   /**
    * Este método elimina un usuario específico por su ID (idUsuario). El ID del usuario se obtiene de los parámetros
-   * de la ruta de la solicitud HTTP. Se hace una llamada al método 'remove' del modelo de usuario para eliminar
+   * de la ruta de la solicitud HTTP. Se hace una llamada al método 'removeById' del modelo de usuario para eliminar
    * el usuario de la base de datos. Si la eliminación es exitosa, se devuelve una respuesta con estado 200
    * y un mensaje indicando el éxito de la operación.
    * Si no se encuentra el usuario a eliminar o si ocurre un error durante la eliminación, se devuelve una respuesta
    * de estado 500 con los detalles del error.
    */
   async deleteById(req, res) {
+    const usuarioId = req.params.usuarioId;
     try {
-      const usuarioId = req.params.usuarioId;
-      await usuarioModel.remove(usuarioId);
+      const result = await usuarioModel.removeById(usuarioId);
+      if (result.affectedRows === 0) {
+        return res
+          .status(404)
+          .json({ mensaje: `Usuario con ID ${usuarioId} no encontrado` });
+      }
       res.status(200).json({
         mensaje: `Usuario con ID ${usuarioId} eliminado exitosamente`,
       });

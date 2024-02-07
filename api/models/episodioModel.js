@@ -1,172 +1,163 @@
-// Importar el pool de conexión a la base de datos
 const db = require('../../server/db_connection');
+const Joi = require('joi');
 
-// Define el modelo para la entidad episodio
-const episodioModel = function (episodio) {
-  this.NHC_paciente = episodio.NHC_paciente;
-  this.Medico = episodio.Medico;
-  this.fecha_episodio = episodio.fecha_episodio;
-  this.tipo_asistencia = episodio.tipo_asistencia;
-  this.motivo_consulta = episodio.motivo_consulta;
-  this.anamnesis = episodio.anamnesis;
-  this.diagnostico = episodio.diagnostico;
-  this.tratamiento = episodio.tratamiento;
-  this.peso = episodio.peso;
-  this.pa = episodio.pa;
-  this.spo2 = episodio.spo2;
-};
+// Esquema de validación para la creación de un episodio
+const episodioSchema = Joi.object({
+  NHC_paciente: Joi.number().integer().required(),
+  Medico: Joi.number().integer().required(),
+  fecha_episodio: Joi.date().optional(),
+  tipo_asistencia: Joi.string().max(20).optional(),
+  motivo_consulta: Joi.string().optional(),
+  anamnesis: Joi.string().optional(),
+  diagnostico: Joi.string().optional(),
+  tratamiento: Joi.string().optional(),
+  peso: Joi.number().precision(2).optional(),
+  pa: Joi.number().precision(2).optional(),
+  spo2: Joi.number().precision(2).optional(),
+});
 
-// Crea un nuevo episodio
-episodioModel.create = (nuevoEpisodio, resultado) => {
-  db.query('INSERT INTO episodio SET ?', nuevoEpisodio, (err, res) => {
-    if (err) {
-      console.error('Error al crear el episodio:', err);
-      resultado(
-        { error: 'Error al crear episodio', detalles: err.sqlMessage },
-        null
+// Esquema de validación para actualización parcial con PATCH
+const episodioSchemaUpdate = Joi.object({
+  Medico: Joi.number().integer().optional(),
+  fecha_episodio: Joi.date().optional(),
+  tipo_asistencia: Joi.string().max(20).optional(),
+  motivo_consulta: Joi.string().optional(),
+  anamnesis: Joi.string().optional(),
+  diagnostico: Joi.string().optional(),
+  tratamiento: Joi.string().optional(),
+  peso: Joi.number().precision(2).optional(),
+  pa: Joi.number().precision(2).optional(),
+  spo2: Joi.number().precision(2).optional(),
+}).min(1); // Requiere al menos un campo para la actualización
+
+const episodioModel = {
+  /**
+   * Este método crea un nuevo episodio en la base de datos.
+   * Primero valida los datos de entrada con episodioSchema antes de la inserción.
+   * En caso de error de validación, lanza una excepción con el mensaje de error correspondiente.
+   */
+  async create(nuevoEpisodio) {
+    const { error, value } = episodioSchema.validate(nuevoEpisodio);
+    if (error) {
+      throw new Error(
+        `Validación fallida: ${error.details.map((x) => x.message).join(', ')}`
       );
-      return;
     }
-    resultado(null, { idEpisodio: res.insertId, ...nuevoEpisodio });
-  });
-};
 
-// Obtiene todos los episodios
-episodioModel.getAll = (resultado) => {
-  db.query('SELECT * FROM episodio', (err, res) => {
-    if (err) {
-      console.error('Error al obtener los episodios:', err);
-      resultado(
-        { error: 'Error al obtener episodios', detalles: err.sqlMessage },
-        null
+    try {
+      const [res] = await db.query('INSERT INTO episodio SET ?', value);
+      return { idEpisodio: res.insertId, ...value };
+    } catch (err) {
+      throw new Error(`Error al crear el episodio: ${err.message}`);
+    }
+  },
+
+  /**
+   * Este método obtiene todos los episodios de la base de datos. No requiere validación.
+   * En caso de error durante la consulta, lanza una excepción con el mensaje de error correspondiente.
+   */
+  async getAll() {
+    try {
+      const [res] = await db.query('SELECT * FROM episodio');
+      return res;
+    } catch (err) {
+      throw new Error(`Error al obtener episodios: ${err.message}`);
+    }
+  },
+
+  /**
+   * Este método busca un episodio por su ID (idEpisodio).
+   * Valida que el idEpisodio sea un número entero válido antes de realizar la consulta.
+   * En caso de no encontrar el episodio, lanza un error especificando que el episodio no fue encontrado.
+   */
+  async findById(idEpisodio) {
+    const { error } = Joi.number().integer().required().validate(idEpisodio);
+    if (error) throw new Error('El idEpisodio proporcionado es inválido.');
+
+    try {
+      const [res] = await db.query(
+        'SELECT * FROM episodio WHERE idEpisodio = ?',
+        [idEpisodio]
       );
-      return;
+      if (res.length === 0) throw new Error('Episodio no encontrado');
+      return res[0];
+    } catch (err) {
+      throw new Error(`Error al buscar el episodio: ${err.message}`);
     }
-    resultado(null, res);
-  });
+  },
+
+  /**
+   * Este método busca todos los episodios relacionados con un paciente mediante su NHC.
+   * Valida que el NHC sea un número entero válido antes de realizar la consulta.
+   * Si no se encuentran episodios, lanza un error especificando que no hay episodios para el paciente.
+   */
+  async findByPacienteNHC(NHC_paciente) {
+    const { error } = Joi.number().integer().required().validate(NHC_paciente);
+    if (error) throw new Error('El NHC proporcionado es inválido.');
+
+    try {
+      const [res] = await db.query(
+        'SELECT * FROM episodio WHERE NHC_paciente = ?',
+        [NHC_paciente]
+      );
+      if (res.length === 0)
+        throw new Error(
+          'No se encontraron episodios para el NHC proporcionado'
+        );
+      return res;
+    } catch (err) {
+      throw new Error(
+        `Error al buscar episodios por NHC de paciente: ${err.message}`
+      );
+    }
+  },
+
+  /**
+   * Actualiza un episodio por su ID (idEpisodio) utilizando los datos proporcionados.
+   * Valida los datos de entrada con `episodioSchemaUpdate` asegurando que al menos un campo sea proporcionado para la actualización.
+   * Si no se encuentran cambios o el episodio no existe, lanza un error específico.
+   */
+  async updateById(idEpisodio, datosEpisodio) {
+    const { error, value } = episodioSchemaUpdate.validate(datosEpisodio);
+    if (error) {
+      throw new Error(
+        `Validación fallida: ${error.details.map((x) => x.message).join(', ')}`
+      );
+    }
+
+    try {
+      const [res] = await db.query(
+        'UPDATE episodio SET ? WHERE idEpisodio = ?',
+        [value, idEpisodio]
+      );
+      if (res.affectedRows === 0)
+        throw new Error('Episodio no encontrado o sin cambios necesarios');
+      return { affectedRows: res.affectedRows };
+    } catch (err) {
+      throw new Error(`Error al actualizar el episodio: ${err.message}`);
+    }
+  },
+
+  /**
+   * Este método elimina un episodio por su ID (idEpisodio).
+   * Valida que el idEpisodio sea un número entero válido antes de realizar la eliminación.
+   * Si el episodio no existe, lanza un error específico.
+   */
+  async removeById(idEpisodio) {
+    const { error } = Joi.number().integer().required().validate(idEpisodio);
+    if (error) throw new Error('El idEpisodio proporcionado es inválido.');
+
+    try {
+      const [res] = await db.query(
+        'DELETE FROM episodio WHERE idEpisodio = ?',
+        [idEpisodio]
+      );
+      if (res.affectedRows === 0) throw new Error('Episodio no encontrado');
+      return { affectedRows: res.affectedRows };
+    } catch (err) {
+      throw new Error(`Error al eliminar el episodio: ${err.message}`);
+    }
+  },
 };
 
-// Obtiene un episodio por su id
-episodioModel.findById = (idEpisodio, resultado) => {
-  db.query(
-    'SELECT * FROM episodio WHERE idEpisodio = ?',
-    [idEpisodio],
-    (err, res) => {
-      if (err) {
-        console.error('Error al buscar el episodio:', err);
-        resultado(
-          { error: 'Error al buscar episodio', detalles: err.sqlMessage },
-          null
-        );
-        return;
-      }
-      if (res.length) {
-        resultado(null, res[0]);
-      } else {
-        resultado({ tipo: 'Episodio no encontrado' }, null);
-      }
-    }
-  );
-};
-
-// Obtiene todos los episodios de un paciente por su NHC
-episodioModel.findByPacienteNHC = (NHC_paciente, resultado) => {
-  db.query(
-    'SELECT * FROM episodio WHERE NHC_paciente = ?',
-    [NHC_paciente],
-    (err, res) => {
-      if (err) {
-        console.error('Error al buscar episodios por NHC de paciente:', err);
-        resultado(
-          {
-            error: 'Error al buscar episodios por NHC de paciente',
-            detalles: err.sqlMessage,
-          },
-          null
-        );
-        return;
-      }
-      if (res.length) {
-        resultado(null, res);
-      } else {
-        resultado(
-          { tipo: 'No se encontraron episodios para el NHC proporcionado' },
-          null
-        );
-      }
-    }
-  );
-};
-
-// Actualiza un episodio por su id
-episodioModel.updateById = (idEpisodio, episodio, resultado) => {
-  const updateFields = {};
-  if ('NHC_paciente' in episodio)
-    updateFields.NHC_paciente = episodio.NHC_paciente;
-  if ('Medico' in episodio) updateFields.Medico = episodio.Medico;
-  if ('fecha_episodio' in episodio)
-    updateFields.fecha_episodio = episodio.fecha_episodio;
-  if ('tipo_asistencia' in episodio)
-    updateFields.tipo_asistencia = episodio.tipo_asistencia;
-  if ('motivo_consulta' in episodio)
-    updateFields.motivo_consulta = episodio.motivo_consulta;
-  if ('anamnesis' in episodio) updateFields.anamnesis = episodio.anamnesis;
-  if ('diagnostico' in episodio)
-    updateFields.diagnostico = episodio.diagnostico;
-  if ('tratamiento' in episodio)
-    updateFields.tratamiento = episodio.tratamiento;
-  if ('peso' in episodio) updateFields.peso = episodio.peso;
-  if ('pa' in episodio) updateFields.pa = episodio.pa;
-  if ('spo2' in episodio) updateFields.spo2 = episodio.spo2;
-
-  if (Object.keys(updateFields).length === 0) {
-    resultado({ tipo: 'Nada que actualizar' }, null);
-    return;
-  }
-
-  db.query(
-    'UPDATE episodio SET ? WHERE idEpisodio = ?',
-    [updateFields, idEpisodio],
-    (err, res) => {
-      if (err) {
-        console.error('Error al actualizar el episodio:', err);
-        resultado(
-          { error: 'Error al actualizar episodio', detalles: err.sqlMessage },
-          null
-        );
-        return;
-      }
-      if (res.affectedRows === 0) {
-        resultado({ tipo: 'Episodio no encontrado' }, null);
-      } else {
-        resultado(null, { idEpisodio, ...updateFields });
-      }
-    }
-  );
-};
-
-// Elimina un episodio por su id
-episodioModel.removeById = (idEpisodio, resultado) => {
-  db.query(
-    'DELETE FROM episodio WHERE idEpisodio = ?',
-    [idEpisodio],
-    (err, res) => {
-      if (err) {
-        console.error('Error al eliminar el episodio:', err);
-        resultado(
-          { error: 'Error al eliminar episodio', detalles: err.sqlMessage },
-          null
-        );
-        return;
-      }
-      if (res.affectedRows === 0) {
-        resultado({ tipo: 'Episodio no encontrado' }, null);
-      } else {
-        resultado(null, res);
-      }
-    }
-  );
-};
-
-// Exportar el modelo
 module.exports = episodioModel;

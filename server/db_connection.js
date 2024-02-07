@@ -19,16 +19,19 @@ const dbPool = mysql.createPool({
 
 /*
   Se solicita la conexion: Si hay un error durante la conexión, se imprime un mensaje de error. 
-  Si la conexión es exitosa, se imprime un mensaje de éxito y la conexión se libera con release()
+  Si la conexión es exitosa, se imprime un mensaje de éxito.
  */
-
-dbPool.getConnection((err, connection) => {
-  if (err) {
-    console.error('Error de conexión a la base de datos:', err);
-  } else {
+// Verificar conexión a la base de datos
+const checkConnection = async () => {
+  try {
+    const connection = await dbPool.getConnection();
     console.log('Conexión exitosa a la base de datos');
     connection.release(); // Devuelve la conexión al pool
+  } catch (err) {
+    console.error('Error de conexión a la base de datos:', err);
   }
-});
+};
+
+checkConnection(); // Llama a la función para verificar la conexión
 
 module.exports = dbPool;

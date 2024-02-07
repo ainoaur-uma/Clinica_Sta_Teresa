@@ -1,4 +1,5 @@
 const personaModel = require('../models/personaModel');
+
 const personaController = {
   /**
    * Este método crea una nueva persona. Recibe los datos de la persona desde el cuerpo de la solicitud HTTP y los valida.
@@ -70,7 +71,7 @@ const personaController = {
    */
   async findByCarnet(req, res) {
     try {
-      const carnet_identidad = req.params.carnet_identidad;
+      const carnet_identidad = req.params.carnetIdentidad;
       const persona = await personaModel.findByCarnet(carnet_identidad);
       if (!persona) {
         return res.status(404).json({
@@ -168,7 +169,7 @@ const personaController = {
    * En caso de error durante la actualización, envía una respuesta con estado 500 y los detalles del error.
    */
   async updateById(req, res) {
-    const idPersona = req.params.id;
+    const idPersona = req.params.personaId;
     try {
       const datosActualizados = req.body;
       const result = await personaModel.updateById(
@@ -193,15 +194,20 @@ const personaController = {
 
   /**
    * Este método elimina una persona específica por su ID (idPersona). El ID de la persona se obtiene de los parámetros
-   * de la ruta de la solicitud HTTP.Se hace una llamada al método 'remove' del modelo de persona para eliminar la persona de la base de datos.
+   * de la ruta de la solicitud HTTP.Se hace una llamada al método 'removeById' del modelo de persona para eliminar la persona de la base de datos.
    * Si la eliminación es exitosa, devuelve una respuesta con estado 200 y un mensaje indicando el éxito.
    * En caso de no encontrar la persona a eliminar, devuelve un estado 404.
    * En caso de error durante la eliminación, envía una respuesta con estado 500 y los detalles del error.
    */
   async deleteById(req, res) {
+    const idPersona = req.params.personaId;
     try {
-      const personaId = req.params.id; // Asegúrate de que el parámetro coincida con el definido en tus rutas
-      await personaModel.remove(personaId);
+      const result = await personaModel.removeById(personaId);
+      if (result.affectedRows === 0) {
+        return res
+          .status(404)
+          .json({ mensaje: `Persona con ID ${personaId} no encontrada` });
+      }
       res.status(200).json({
         mensaje: `Persona con ID ${personaId} eliminada exitosamente`,
       });

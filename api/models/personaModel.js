@@ -18,7 +18,7 @@ const personaSchema = Joi.object({
   direccion: Joi.string().max(255),
 });
 
-// Esquema de validación para la actualización de una persona con PATCH
+// Esquema de validación para la actualización parcial con PATCH
 const personaSchemaUpdate = Joi.object({
   carnet_identidad: Joi.string().max(20).optional(),
   nombre: Joi.string().max(100).optional(),
@@ -74,6 +74,7 @@ const personaModel = {
   async findById(idPersona) {
     const { error } = Joi.number().integer().required().validate(idPersona);
     if (error) throw new Error('El ID proporcionado es inválido.');
+
     try {
       const [res] = await db.query(
         'SELECT * FROM persona WHERE idPersona = ?',
@@ -188,7 +189,7 @@ const personaModel = {
    * Asegura que al menos un campo sea proporcionado para la actualización. Si no se encuentran cambios o la persona
    * no existe, lanza un error.
    */
-  async updateById(id, datosPersona) {
+  async updateById(personaId, datosPersona) {
     const { error } = personaSchemaUpdate.validate(datosPersona);
     if (error)
       throw new Error(
@@ -197,7 +198,7 @@ const personaModel = {
     try {
       const [res] = await db.query('UPDATE persona SET ? WHERE idPersona = ?', [
         datosPersona,
-        id,
+        personaId,
       ]);
       if (res.affectedRows === 0)
         throw new Error('Persona no encontrada o sin cambios necesarios.');
@@ -211,12 +212,12 @@ const personaModel = {
    * Este método elimina una persona por su ID (idPersona) tras validar que el ID sea un número entero válido.
    * Si la persona no existe o no se puede eliminar, lanza un error.
    */
-  async remove(id) {
-    const { error } = Joi.number().integer().required().validate(id);
+  async removeById(personaId) {
+    const { error } = Joi.number().integer().required().validate(personaId);
     if (error) throw new Error('El ID proporcionado es inválido.');
     try {
       const [res] = await db.query('DELETE FROM persona WHERE idPersona = ?', [
-        id,
+        personaId,
       ]);
       if (res.affectedRows === 0) throw new Error('Persona no encontrada.');
       return { affectedRows: res.affectedRows };

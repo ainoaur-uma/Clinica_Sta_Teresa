@@ -1,166 +1,129 @@
-// Importar los modelos
 const hceModel = require('../models/hceModel');
 const pacienteModel = require('../models/pacienteModel');
-const personaModel = require('../models/personaModel');
 
-// Validar los datos de la HCE
-const validarHce = (hce, isUpdating = false) => {
-  const errores = [];
-  if (!isUpdating) {
-    if (!hce.NHC_paciente) {
-      errores.push('El NHC del paciente es requerido.');
+const hceController = {
+  /**
+   * Crea una nueva Historia Clínica Electrónica (HCE) para un paciente.
+   * Antes de crear la HCE, verifica la existencia del paciente mediante su NHC.
+   * Si la validación es exitosa y el paciente existe, procede a crear la HCE.
+   * Devuelve una respuesta con estado 201 y los datos de la HCE creada.
+   * En caso de error, como la inexistencia del paciente o fallos en la inserción, envía una respuesta con estado 500 y los detalles del error.
+   */
+  async create(req, res) {
+    try {
+      const nuevaHCE = req.body;
+      await pacienteModel.findByNhc(nuevaHCE.NHC_paciente);
+      const hceCreada = await hceModel.create(nuevaHCE);
+      res.status(201).json(hceCreada);
+    } catch (err) {
+      res
+        .status(500)
+        .json({ mensaje: 'Error al crear la HCE', error: err.message });
     }
-  }
-  return errores;
-};
+  },
 
-// Verificar la existencia del paciente y su correspondiente persona
-const verificarExistenciaPacientePersona = (nhc, callback) => {
-  // Primero verifica si la persona existe
-  personaModel.findById(nhc, (err, persona) => {
-    if (err || !persona) {
-      callback({ tipo: 'Persona no encontrada', idPersona: nhc }, null);
-      return;
-    }
-
-    // Si la persona existe, verifica si es un paciente
-    pacienteModel.findById(nhc, (err, paciente) => {
-      if (err || !paciente) {
-        callback({ tipo: 'Paciente no encontrado', nhc }, null);
-        return;
-      }
-      callback(null, { paciente, persona });
-    });
-  });
-};
-
-// Crear una nueva HCE
-exports.create = (req, res) => {
-  const nuevaHce = {
-    NHC_paciente: req.body.NHC_paciente,
-    sexo: req.body.sexo,
-    grupo_sanguineo: req.body.grupo_sanguineo,
-    alergias: req.body.alergias,
-    antecedentes_clinicos: req.body.antecedentes_clinicos,
-  };
-
-  const errores = validarHce(nuevaHce);
-  if (errores.length > 0) {
-    return res.status(400).json({ mensaje: 'Errores de validación', errores });
-  }
-
-  verificarExistenciaPacientePersona(nuevaHce.NHC_paciente, (err, result) => {
-    if (err) {
-      return res.status(404).json({
-        mensaje: `Error al verificar existencia del Paciente con NHC ${nuevaHce.NHC_paciente}`,
-        error: err,
+  /**
+   * Este método recupera todas las HCEs de la base de datos. Llama al método 'getAll' del modelo de HCEs,
+   * que ejecuta una consulta SQL para obtener todos los registros de HCEs.
+   * Devuelve una lista de HCEs con una respuesta de estado 200.
+   * En caso de error, captura la excepción y envía una respuesta con estado 500 y los detalles del error.
+   */
+  async findAll(req, res) {
+    try {
+      const hces = await hceModel.getAll();
+      res.status(200).json(hces);
+    } catch (err) {
+      res.status(500).json({
+        mensaje: 'Error al obtener todas las HCEs',
+        error: err.message,
       });
     }
+  },
 
-    hceModel.create(nuevaHce, (err, hce) => {
-      if (err) {
-        console.error('Error al crear HCE:', err);
-        return res.status(500).json({
-          mensaje: 'Error al crear HCE',
-          error: err.sqlMessage,
+  /**
+   * Este método obtiene la Historia Clínica Electrónica (HCE) de un paciente específico por su NHC.
+   * El NHC se obtiene de los parámetros de la solicitud HTTP.
+   * Devuelve los detalles de la HCE con una respuesta de estado 200 si se encuentra.
+   * En caso de no encontrar la HCE para el paciente, devuelve un estado 404.
+   * En caso de error en la consulta, envía una respuesta con estado 500 y los detalles del error.
+   */
+  async findByPacienteNHC(req, res) {
+    const NHC_paciente = req.params.NHC_paciente;
+    try {
+      const hce = await hceModel.findByPacienteNHC(NHC_paciente);
+      if (!hce) {
+        return res.status(404).json({
+          mensaje: `No se encontró la HCE para el paciente con NHC ${NHC_paciente}`,
         });
       }
-      res.status(201).json(hce);
-    });
-  });
-};
-
-// Obtener todas las HCE
-exports.findAll = (req, res) => {
-  hceModel.getAll((err, hces) => {
-    if (err) {
-      console.error('Error al obtener HCE:', err);
-      return res.status(500).json({
-        mensaje: 'Error al obtener HCE',
-        error: err.sqlMessage,
+      res.status(200).json(hce);
+    } catch (err) {
+      res.status(500).json({
+        mensaje: `Error al obtener la HCE para el paciente con NHC ${NHC_paciente}`,
+        error: err.message,
       });
     }
-    res.status(200).json(hces);
-  });
-};
+  },
 
-// Obtener una HCE por NHC del paciente
-exports.findOne = (req, res) => {
-  const nhc = req.params.NHC_paciente;
-  hceModel.findByNHC(nhc, (err, hce) => {
-    if (err) {
-      console.error('Error al obtener HCE:', err);
-      return res.status(500).json({
-        mensaje: `Error al obtener HCE para el NHC ${nhc}`,
-        error: err.sqlMessage,
+  /** Este método actualiza la Historia Clínica Electrónica (HCE) de un paciente específico por su NHC con los datos proporcionados en el cuerpo de la solicitud HTTP.
+   * Verifica primero la existencia del paciente asociado a la HCE.
+   * Si la actualización es exitosa, devuelve una respuesta con estado 200 y un mensaje de éxito.
+   * En caso de no encontrar la HCE, devuelve un estado 404.
+   * En caso de error durante la actualización, envía una respuesta con estado 500 y los detalles del error.
+   */
+  async updateByNHC(req, res) {
+    const NHC_paciente = req.params.NHC_paciente;
+    const datosActualizados = req.body;
+
+    try {
+      await pacienteModel.findByNhc(NHC_paciente);
+
+      const resultado = await hceModel.updateByNHC(
+        NHC_paciente,
+        datosActualizados
+      );
+      if (resultado.affectedRows === 0) {
+        return res
+          .status(404)
+          .json({ mensaje: `HCE con NHC ${NHC_paciente} no encontrada` });
+      }
+      res.status(200).json({
+        mensaje: `HCE con NHC ${NHC_paciente} actualizada exitosamente`,
+      });
+    } catch (err) {
+      res.status(500).json({
+        mensaje: `Error al actualizar la HCE con NHC ${NHC_paciente}`,
+        error: err.message,
       });
     }
-    if (!hce) {
-      return res.status(404).json({ mensaje: 'HCE no encontrada' });
-    }
-    res.status(200).json(hce);
-  });
-};
+  },
 
-// Actualizar una HCE por NHC del paciente
-exports.update = (req, res) => {
-  const nhc = req.params.NHC_paciente;
-  const updatedData = req.body;
-
-  verificarExistenciaPacientePersona(nhc, (err, result) => {
-    if (err) {
-      return res.status(404).json({
-        mensaje: `Paciente con NHC ${nhc} no encontrado`,
-        error: err.tipo,
-      });
-    }
-
-    const errores = validarHce(updatedData, true);
-    if (errores.length > 0) {
-      return res
-        .status(400)
-        .json({ mensaje: 'Errores de validación', errores });
-    }
-
-    hceModel.updateByNHC(nhc, updatedData, (err, result) => {
-      if (err) {
-        console.error('Error al actualizar HCE:', err);
-        return res.status(500).json({
-          mensaje: 'Error al actualizar HCE',
-          error: err.sqlMessage,
+  /**
+   * Este método elimina una HCE específica por el NHC del paciente.
+   * El NHC se obtiene de los parámetros de la ruta de la solicitud HTTP.
+   * Si la eliminación es exitosa, devuelve una respuesta con estado 200 y un mensaje indicando el éxito.
+   * En caso de no encontrar la HCE a eliminar, devuelve un estado 404.
+   * En caso de error durante la eliminación, envía una respuesta con estado 500 y los detalles del error.
+   */
+  async deleteByNHC(req, res) {
+    const NHC_paciente = req.params.NHC_paciente;
+    try {
+      const resultado = await hceModel.removeByNHC(NHC_paciente);
+      if (resultado.affectedRows === 0) {
+        return res.status(404).json({
+          mensaje: `HCE del paciente con  NHC ${NHC_paciente} no encontrada`,
         });
       }
-      if (result.affectedRows === 0) {
-        return res.status(404).json({ mensaje: 'HCE no encontrada' });
-      }
-      res.status(200).json({ mensaje: `HCE actualizada exitosamente` });
-    });
-  });
-};
-
-// Eliminar una HCE por NHC del paciente
-exports.delete = (req, res) => {
-  const nhc = req.params.NHC_paciente;
-  hceModel.remove(nhc, (err, result) => {
-    if (err) {
-      console.error('Error al eliminar HCE:', err);
-      return res.status(500).json({
-        mensaje: `Error al eliminar HCE del paciente `,
-        error: err.sqlMessage,
+      res
+        .status(200)
+        .json({ mensaje: `HCE con NHC ${nhc} eliminada exitosamente` });
+    } catch (err) {
+      res.status(500).json({
+        mensaje: `Error al eliminar la HCE del  NHC ${NHC_paciente}`,
+        error: err.message,
       });
     }
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ mensaje: 'HCE no encontrada' });
-    }
-    res.status(200).json({ mensaje: `HCE eliminada exitosamente` });
-  });
+  },
 };
 
-// Exportar las funciones del controlador
-module.exports = {
-  create: exports.create,
-  findAll: exports.findAll,
-  findOne: exports.findOne,
-  update: exports.update,
-  delete: exports.delete,
-};
+module.exports = hceController;

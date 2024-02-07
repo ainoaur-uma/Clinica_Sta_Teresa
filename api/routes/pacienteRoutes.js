@@ -8,8 +8,9 @@ const pacienteController = require('../controllers/pacienteController');
 router.post('/', pacienteController.create); // Crear un nuevo paciente
 router.get('/', pacienteController.findAll); // Obtener todos los pacientes
 router.get('/:NHC', pacienteController.findOne); // Obtener un paciente por su NHC
-router.patch('/:NHC', pacienteController.update); // Actualizar un paciente por su NHC (utilizando PATCH)
-router.delete('/:NHC', pacienteController.delete); // Eliminar un paciente por su NHC
+router.get('/detalle/:NHC', pacienteController.findByNHCWithPersonaDetails); //Obtiene los datos personales del paciente por su NHC
+router.patch('/:NHC', pacienteController.updateById); // Actualizar un paciente por su NHC (utilizando PATCH)
+router.delete('/:NHC', pacienteController.deleteById); // Eliminar un paciente por su NHC
 
 // Exportar el router
 module.exports = router;

@@ -3,6 +3,7 @@ const db = require('../../server/db_connection');
 const Joi = require('joi');
 const bcrypt = require('bcryptjs');
 const saltRounds = 10;
+const personaModel = require('./personaModel');
 
 // Esquema de validación Joi para un usuario durante la creación
 const usuarioSchema = Joi.object({
@@ -21,12 +22,18 @@ const usuarioSchemaUpdate = Joi.object({
 
 const usuarioModel = {
   /**
-   * Crea un nuevo usuario en la base de datos después de validar los datos de entrada.
-   * La contraseña proporcionada se hashea antes de la inserción para garantizar la seguridad.
-   * Si los datos no cumplen con el esquema, se lanza un error de validación.
-   * Si la inserción es exitosa, devuelve el nuevo usuario con su ID asignado.
+   * Este método crea un nuevo usuario verificando primero que la persona asociada exista.
+   * Se validan los datos de entrada y se hashea la contraseña para seguridad.
+   * En caso de error en la validación o en la inserción, se lanza un error específico.
    */
   async create(nuevoUsuario) {
+    try {
+      await personaModel.findById(nuevoUsuario.idUsuario);
+    } catch (err) {
+      throw new Error(
+        `No existe una persona con el ID ${nuevoUsuario.idUsuario}: ${err.message}`
+      );
+    }
     const { error, value } = usuarioSchema.validate(nuevoUsuario);
     if (error) {
       throw new Error(
@@ -34,7 +41,7 @@ const usuarioModel = {
       );
     }
 
-    // Hashear la contraseña antes de insertar el nuevo usuario en la base de datos
+    // Hashear la contraseña antes de la inserción
     if (value.contrasena) {
       value.contrasena = await bcrypt.hash(value.contrasena, saltRounds);
     }
@@ -48,7 +55,7 @@ const usuarioModel = {
   },
 
   /**
-   * Obtiene todos los usuarios de la base de datos.
+   * Este método obtiene todos los usuarios de la base de datos.
    * En caso de error de conexión, se lanza un error específico.
    */
   async getAll() {
@@ -61,7 +68,7 @@ const usuarioModel = {
   },
 
   /**
-   * Busca un usuario por su ID (idUsuario). Valida que el ID sea numérico y exista en la base de datos.
+   * Este método busca un usuario por su ID (idUsuario). Valida que el ID sea numérico y exista en la base de datos.
    * En caso de no encontrar el usuario, se lanza un error específico.
    */
   async findById(usuarioId) {
@@ -81,7 +88,7 @@ const usuarioModel = {
   },
 
   /**
-   * Busca un usuario por su nombre de usuario (nombre_usuario). Valida que el nombre de usuario sea una cadena válida.
+   * Este método busca un usuario por su nombre de usuario (nombre_usuario). Valida que el nombre de usuario sea una cadena válida.
    * En caso de no encontrar el usuario, se lanza un error específico.
    */
   async findByUsername(nombre_usuario) {
@@ -102,12 +109,11 @@ const usuarioModel = {
   },
 
   /**
-   * Actualiza un usuario por su ID(idUsuario) utilizando los datos proporcionados. Antes de la actualización,
+   * Este método actualiza un usuario por su ID(idUsuario) utilizando los datos proporcionados. Antes de la actualización,
    * valida los datos utilizando `usuarioSchemaUpdate`. Si se proporciona una contraseña, la hashea
    * antes de guardarla en la base de datos. Esto asegura que todas las contraseñas se almacenen de forma segura.
    */
   async updateById(id, usuario) {
-    // Validación de los datos de entrada con usuarioSchemaUpdate
     const { error, value } = usuarioSchemaUpdate.validate(usuario);
     if (error)
       throw new Error(
@@ -136,7 +142,7 @@ const usuarioModel = {
    * Elimina un usuario por su ID (idUsuario) después de validar que el ID sea numérico.
    * Verifica que el usuario a eliminar exista. En caso de no encontrar el usuario, se lanza un error específico.
    */
-  async remove(id) {
+  async removeById(id) {
     const { error } = Joi.number().integer().required().validate(id);
     if (error) throw new Error('El ID proporcionado es inválido.');
 
