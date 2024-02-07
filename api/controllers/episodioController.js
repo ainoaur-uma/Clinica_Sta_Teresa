@@ -68,10 +68,10 @@ const episodioController = {
    * En caso de no encontrar episodios para el paciente, devuelve un estado 404.
    * En caso de error en la consulta, envía una respuesta con estado 500 y los detalles del error.
    */
-  async findByPacienteNHC(req, res) {
+  async findByNHC(req, res) {
     const NHC_paciente = req.params.NHC_paciente;
     try {
-      const episodios = await episodioModel.findByPacienteNHC(NHC_paciente);
+      const episodios = await episodioModel.findByNHC(NHC_paciente);
       if (episodios.length === 0) {
         return res.status(404).json({
           mensaje: `No se encontraron episodios para el paciente con NHC ${NHC_paciente}`,

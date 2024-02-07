@@ -91,7 +91,7 @@ const episodioModel = {
    * Valida que el NHC sea un número entero válido antes de realizar la consulta.
    * Si no se encuentran episodios, lanza un error especificando que no hay episodios para el paciente.
    */
-  async findByPacienteNHC(NHC_paciente) {
+  async findByNHC(NHC_paciente) {
     const { error } = Joi.number().integer().required().validate(NHC_paciente);
     if (error) throw new Error('El NHC proporcionado es inválido.');
 
@@ -145,7 +145,8 @@ const episodioModel = {
    */
   async removeById(idEpisodio) {
     const { error } = Joi.number().integer().required().validate(idEpisodio);
-    if (error) throw new Error('El idEpisodio proporcionado es inválido.');
+    if (error)
+      throw new Error('El  ID del Episodio proporcionado es inválido.');
 
     try {
       const [res] = await db.query(

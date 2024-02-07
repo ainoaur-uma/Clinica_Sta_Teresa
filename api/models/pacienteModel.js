@@ -130,12 +130,12 @@ const pacienteModel = {
       if (res.affectedRows === 0) {
         throw new Error('Paciente no encontrado o sin cambios necesarios.');
       }
-      // Devuelve el número de filas afectadas para indicar el éxito de la operación
       return { affectedRows: res.affectedRows };
     } catch (err) {
       throw new Error(`Error al actualizar el paciente: ${err.message}`);
     }
   },
+
   /**
    * Este método elimina un paciente por su NHC tras validar que el ID sea un número entero válido.
    * Si ek paciente no existe o no se puede eliminar, lanza un error.

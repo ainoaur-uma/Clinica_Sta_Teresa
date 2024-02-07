@@ -70,7 +70,7 @@ const hceModel = {
    * Valida que el NHC sea un número entero válido antes de realizar la consulta.
    * En caso de no encontrar la HCE, lanza un error especificando que la HCE no fue encontrada.
    */
-  async findByPacienteNHC(NHC_paciente) {
+  async findByNHC(NHC_paciente) {
     const { error } = Joi.number().integer().required().validate(NHC_paciente);
     if (error) throw new Error('El NHC proporcionado es inválido.');
 
@@ -94,8 +94,8 @@ const hceModel = {
    * Antes de la actualización, valida los datos utilizando `hceSchema`.
    * Si no se encuentran cambios o el paciente no existe, lanza un error.
    */
-  async updateByPacienteNHC(NHC_paciente, datosHCE) {
-    const { error, value } = hceSchema.validate(datosHCE);
+  async updateByNHC(NHC_paciente, datosHCE) {
+    const { error, value } = hceSchemaUpdate.validate(datosHCE);
     if (error) {
       throw new Error(
         `Validación fallida: ${error.details.map((x) => x.message).join(', ')}`
@@ -122,7 +122,7 @@ const hceModel = {
    * Valida que el NHC sea un número entero válido antes de ejecutar la eliminación.
    * Si la HCE no existe, lanza un error indicando que no se encontró.
    */
-  async removeByPacienteNHC(NHC_paciente) {
+  async removeByNHC(NHC_paciente) {
     const { error } = Joi.number().integer().required().validate(NHC_paciente);
     if (error) throw new Error('El NHC proporcionado es inválido.');
 
@@ -135,7 +135,7 @@ const hceModel = {
         throw new Error(
           'HCE no encontrada para el paciente con el NHC proporcionado'
         );
-      return { mensaje: 'HCE eliminada exitosamente.' };
+      return { affectedRows: result.affectedRows };
     } catch (err) {
       throw new Error(`Error al eliminar la HCE: ${err.message}`);
     }

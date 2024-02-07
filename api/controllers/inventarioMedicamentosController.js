@@ -1,257 +1,166 @@
-// Importar los modelos
-const inventarioMedicamentosModel = require('../models/inventarioMedicamentosModel');
+const InventarioMedicamentosModel = require('../models/InventarioMedicamentosModel');
 const medicamentoModel = require('../models/medicamentoModel');
 
-// Validar los datos del inventario de medicamentos
-const validarInventario = (inventario, isUpdating = false) => {
-  const errores = [];
-  if (!isUpdating) {
-    // Validación para operaciones POST (creación)
-    if (!inventario.idMedicamento) {
-      errores.push('El ID del medicamento es requerido.');
-    }
-    if (inventario.cantidad_actual == null) {
-      errores.push('La cantidad actual es requerida.');
-    }
-    if (!inventario.fecha_registro) {
-      errores.push('La fecha de registro es requerida.');
-    }
-  } else {
-    // Validación para operaciones PATCH (actualización)
-    if ('cantidad_actual' in inventario && inventario.cantidad_actual == null) {
-      errores.push('La cantidad actual no puede estar vacía.');
-    }
-    if ('fecha_registro' in inventario && !inventario.fecha_registro) {
-      errores.push('La fecha de registro no puede estar vacía.');
-    }
-  }
-  return errores;
-};
+const InventarioMedicamentosController = {
+  /**
+   * Crea un nuevo registro. Valida y recibe los datos desde el cuerpo de la solicitud HTTP.
+   * Verifica la existencia de entidades relacionadas antes de crear el registro.
+   * Si la creación es exitosa, devuelve una respuesta con estado 201 y los datos del registro creado.
+   * En caso de error, envía una respuesta con estado 500 y los detalles del error.
+   */
+  async create(req, res) {
+    try {
+      const { idMedicamento, cantidad_actual, fecha_registro } = req.body;
 
-// Verificar la existencia del medicamento por idMedicamento
-const verificarExistenciaMedicamento = (idMedicamento, callback) => {
-  medicamentoModel.findById(idMedicamento, (err, res) => {
-    if (err) {
-      callback(err, null);
-    } else if (!res) {
-      callback({ tipo: 'Medicamento no encontrado', idMedicamento }, null);
-    } else {
-      callback(null, res);
-    }
-  });
-};
-
-// Controlador para crear un nuevo inventario de medicamentos
-exports.create = (req, res) => {
-  const nuevoInventario = {
-    idMedicamento: req.body.idMedicamento,
-    cantidad_actual: req.body.cantidad_actual,
-    fecha_registro: req.body.fecha_registro,
-  };
-  const errores = validarInventario(nuevoInventario);
-  if (errores.length > 0) {
-    return res.status(400).json({ mensaje: 'Errores de validación', errores });
-  }
-
-  verificarExistenciaMedicamento(
-    nuevoInventario.idMedicamento,
-    (err, result) => {
-      if (err) {
-        return res.status(404).json({
-          mensaje: `Medicamento con ID ${nuevoInventario.idMedicamento} no encontrado`,
-          error: err.tipo,
-        });
-      }
-
-      inventarioMedicamentosModel.create(nuevoInventario, (err, inventario) => {
-        if (err) {
-          console.error('Error al crear registro en inventario:', err);
-          return res.status(500).json({
-            mensaje: 'Error al crear registro en inventario',
-            error: err.sqlMessage,
-          });
-        }
-        res.status(201).json(inventario);
-      });
-    }
-  );
-};
-
-// Controlador para obtener todos los registros del inventario
-exports.findAll = (req, res) => {
-  inventarioMedicamentosModel.getAll((err, inventarios) => {
-    if (err) {
-      console.error('Error al obtener inventario:', err);
-      return res.status(500).json({
-        mensaje: 'Error al obtener inventario',
-        error: err.sqlMessage,
-      });
-    }
-    res.status(200).json(inventarios);
-  });
-};
-
-// Obtener los registros del inventario por ID de medicamento
-exports.findOneByIdMedicamento = (req, res) => {
-  const idMedicamento = req.params.idMedicamento;
-  if (!idMedicamento) {
-    return res
-      .status(400)
-      .json({ mensaje: 'ID de medicamento no proporcionado' });
-  }
-
-  inventarioMedicamentosModel.findByIdMedicamento(
-    idMedicamento,
-    (err, inventario) => {
-      if (err) {
-        console.error('Error al buscar en inventario:', err);
-        return res.status(500).json({
-          mensaje: 'Error al buscar en inventario',
-          error: err.sqlMessage,
-        });
-      }
-      if (!inventario) {
-        return res
-          .status(404)
-          .json({ mensaje: 'Registro de inventario no encontrado' });
-      }
-      res.status(200).json(inventario);
-    }
-  );
-};
-
-// Controlador para obtener un registro del inventario por ID del inventario
-exports.findOneByIdInventario = (req, res) => {
-  const idInventario = req.params.idInventario;
-  if (!idInventario) {
-    return res
-      .status(400)
-      .json({ mensaje: 'ID del inventario no proporcionado' });
-  }
-
-  inventarioMedicamentosModel.findByIdInventario(
-    idInventario,
-    (err, inventario) => {
-      if (err) {
-        console.error('Error al buscar en inventario:', err);
-        return res.status(500).json({
-          mensaje: 'Error al buscar en inventario',
-          error: err.sqlMessage,
-        });
-      }
-      if (!inventario) {
-        return res
-          .status(404)
-          .json({ mensaje: 'Registro de inventario no encontrado' });
-      }
-      res.status(200).json(inventario);
-    }
-  );
-};
-
-/**
- Controlador para actualizar un registro del inventario por ID del inventario: Primero, obtiene el registro existente del inventario para encontrar el idMedicamento asociado, como hay dos funciones 
-  para obtener los medicamentos, por idInventario o por idMedicamento y en esta actualizacion queremos hacerlo por idMedicamento, utilizamosla funcion findByIdInventario
-  **/
-exports.updateByIdInventario = (req, res) => {
-  const idInventario = req.params.idInventario;
-  const updatedData = req.body;
-
-  inventarioMedicamentosModel.findByIdInventario(
-    idInventario,
-    (err, inventarioExistente) => {
-      if (err) {
-        console.error('Error al buscar en inventario:', err);
-        return res.status(500).json({
-          mensaje: 'Error al buscar en inventario',
-          error: err.sqlMessage,
-        });
-      }
-      if (!inventarioExistente) {
-        return res
-          .status(404)
-          .json({ mensaje: 'Registro de inventario no encontrado' });
-      }
-
-      // Ahora que se tiene el idMedicamento, se puede  verificar su existencia
-      verificarExistenciaMedicamento(
-        inventarioExistente.idMedicamento,
-        (err, result) => {
-          if (err) {
-            return res.status(404).json({
-              mensaje: `Medicamento con ID ${inventarioExistente.idMedicamento} no encontrado`,
-              error: err.tipo,
-            });
-          }
-
-          //  medicamento existe, se valida el inventario, isUpdating=true
-
-          const errores = validarInventario(updatedData, true);
-          if (errores.length > 0) {
-            return res
-              .status(400)
-              .json({ mensaje: 'Errores de validación', errores });
-          }
-
-          inventarioMedicamentosModel.updateByIdInventario(
-            idInventario,
-            updatedData,
-            (err, result) => {
-              if (err) {
-                console.error('Error al actualizar inventario:', err);
-                return res.status(500).json({
-                  mensaje: 'Error al actualizar inventario',
-                  error: err.sqlMessage,
-                });
-              }
-              if (result.affectedRows === 0) {
-                return res
-                  .status(404)
-                  .json({ mensaje: 'Registro de inventario no encontrado' });
-              }
-              res.status(200).json({
-                mensaje: `Inventario con ID ${idInventario} actualizado exitosamente`,
-              });
-            }
-          );
-        }
+      await medicamentoModel.findById(idMedicamento);
+      const nuevoRegistroInventario = {
+        idMedicamento,
+        cantidad_actual,
+        fecha_registro,
+      };
+      const registroCreado = await InventarioMedicamentosModel.create(
+        nuevoRegistroInventario
       );
+      res.status(201).json(registroCreado);
+    } catch (err) {
+      res.status(500).json({
+        mensaje: 'Error al crear registro de inventario',
+        error: err.message,
+      });
     }
-  );
-};
+  },
 
-//Eliminar un registro del inventario por ID del inventario
-exports.deleteByIdInventario = (req, res) => {
-  const idInventario = req.params.idInventario;
+  /**
+   * Este método recupera todos los registros de la base de datos.Llama al método 'getAll' del pacienteModel,
+   * que ejecute una consulta SQL para obtener todos los registros del inventario.
+   * Devuelve una lista de pacietes con una respuesta de estado 200.
+   * En caso de error, captura la excepción y envía una respuesta con estado 500 y los detalles del error.
+   */
+  async findAll(req, res) {
+    try {
+      const registros = await InventarioMedicamentosModel.getAll();
+      res.status(200).json(registros);
+    } catch (err) {
+      res.status(500).json({
+        mensaje: 'Error al obtener registros de inventario',
+        error: err.message,
+      });
+    }
+  },
 
-  inventarioMedicamentosModel.removeByIdInventario(
-    idInventario,
-    (err, result) => {
-      if (err) {
-        console.error('Error al eliminar registro del inventario:', err);
-        return res.status(500).json({
-          mensaje: `Error al eliminar registro del inventario con ID ${idInventario}`,
-          error: err.sqlMessage,
+  /**
+   * Este método obtiene un registro específico por su ID(idInventario). El idInventario se obtiene de los parámetros de la solicitud HTTP.
+   * Devuelve los datos del registro con una respuesta de estado 200 si se encuentra.
+   * En caso de no encontrar el registro, devuelve un estado 404.
+   * En caso de error en la consulta, envía una respuesta con estado 500 y los detalles del error.
+   */
+  async findOne(req, res) {
+    const idInventario = req.params.idInventario;
+    try {
+      const inventario = await InventarioMedicamentosModel.findById(
+        idInventario
+      );
+      if (!inventario) {
+        return res.status(404).json({
+          mensaje: `Registro de inventario con ID ${idInventario} no encontrado`,
         });
       }
+      res.status(200).json(inventario);
+    } catch (err) {
+      res.status(500).json({
+        mensaje: `Error al obtener el registro de inventario con ID ${idInventario}`,
+        error: err.message,
+      });
+    }
+  },
+
+  /**
+   * Este método busca y devuelve registros de inventario basados en el ID del medicamento.
+   * El ID del medicamento se obtiene de los parámetros de la ruta de la solicitud HTTP.
+   * Se hace una llamada al método 'findByMedicamentoId' del modelo de inventario de medicamentos para realizar la búsqueda.
+   * Si se encuentran registros, se devuelve una lista de registros de inventario con una respuesta de estado 200.
+   * Si no se encuentran registros para el medicamento, se devuelve una respuesta de estado 404 con el mensaje 'Registros no encontrados'.
+   * En caso de un error durante la búsqueda, se devuelve una respuesta de estado 500 con los detalles del error.
+   */
+  async findByMedicamentoId(req, res) {
+    const idMedicamento = req.params.idMedicamento;
+    try {
+      const registros = await InventarioMedicamentosModel.findByMedicamentoId(
+        idMedicamento
+      );
+      if (registros.length === 0) {
+        return res.status(404).json({
+          mensaje: `No se encontraron registros para el medicamento con ID ${idMedicamento}`,
+        });
+      }
+      res.status(200).json(registros);
+    } catch (error) {
+      res.status(500).json({
+        mensaje: `Error al buscar registros de inventario por el ID del medicamento ${idMedicamento}`,
+        error: error.message,
+      });
+    }
+  },
+
+  /**
+   * Este método actualiza un registro de inventario específico por su ID con los datos proporcionados en el cuerpo de la solicitud HTTP.
+   * Verifica primero la existencia del medicamento asociado al inventario.
+   * Si la actualización es exitosa, devuelve una respuesta con estado 200 y un mensaje de éxito.
+   * En caso de no encontrar el registro de inventario, devuelve un estado 404.
+   * En caso de error durante la actualización, envía una respuesta con estado 500 y los detalles del error.
+   */
+  async updateById(req, res) {
+    const idInventario = req.params.idInventario; // Asegúrate de que este parámetro coincida con cómo lo has definido en tus rutas.
+    const datosActualizados = req.body;
+
+    try {
+      const result = await InventarioMedicamentosModel.updateById(
+        idInventario,
+        datosActualizados
+      );
       if (result.affectedRows === 0) {
-        return res
-          .status(404)
-          .json({ mensaje: 'Registro de inventario no encontrado' });
+        return res.status(404).json({
+          mensaje: `Registro de inventario con ID ${idInventario} no encontrado`,
+        });
+      }
+      res.status(200).json({
+        mensaje: `Registro de inventario con ID ${idInventario} actualizado exitosamente`,
+      });
+    } catch (err) {
+      res.status(500).json({
+        mensaje: `Error al actualizar el registro de inventario con ID ${idInventario}`,
+        error: err.message,
+      });
+    }
+  },
+
+  /**
+   * Este método elimina un registro específico por su ID(idInventario). El idInventario se obtiene de los parámetros de la solicitud HTTP.
+   * Si la eliminación es exitosa, devuelve una respuesta con estado 200 y un mensaje de éxito.
+   * En caso de no encontrar el registro a eliminar, devuelve un estado 404.
+   * En caso de error durante la eliminación, envía una respuesta con estado 500 y los detalles del error.
+   */
+  async deleteById(req, res) {
+    const idInventario = req.params.idInventario;
+    try {
+      const resultado = await InventarioMedicamentosModel.removeById(
+        idInventario
+      );
+      if (resultado.affectedRows === 0) {
+        return res.status(404).json({
+          mensaje: `Registro de inventario con ID ${idInventario} no encontrado`,
+        });
       }
       res.status(200).json({
         mensaje: `Registro de inventario con ID ${idInventario} eliminado exitosamente`,
       });
+    } catch (err) {
+      res.status(500).json({
+        mensaje: `Error al eliminar el registro de inventario con ID ${idInventario}`,
+        error: err.message,
+      });
     }
-  );
+  },
 };
 
-// Exportar las funciones del controlador
-module.exports = {
-  create: exports.create,
-  findAll: exports.findAll,
-  findOneByIdMedicamento: exports.findOneByIdMedicamento,
-  findOneByIdInventario: exports.findOneByIdInventario,
-  updateByIdInventario: exports.updateByIdInventario,
-  deleteByIdInventario: exports.deleteByIdInventario,
-};
+module.exports = InventarioMedicamentosController;

@@ -8,8 +8,13 @@ const medicamentoController = require('../controllers/medicamentoController');
 router.post('/', medicamentoController.create); // Crear un nuevo medicamento
 router.get('/', medicamentoController.findAll); // Obtener todos los medicamentos
 router.get('/:medicamentoId', medicamentoController.findOne); // Obtener un medicamento por su ID
-router.patch('/:medicamentoId', medicamentoController.update); // Actualizar un medicamento por su ID (utilizando PATCH)
-router.delete('/:medicamentoId', medicamentoController.delete); // Eliminar un medicamento por su ID
+router.get('/nombre/:nombreMedicamento', medicamentoController.findByNombre); // Obtener medicamentos por nombre
+router.get(
+  '/principioActivo/:principioActivo',
+  medicamentoController.findByPrincipioActivo
+); // Obtener medicamentos por principio activo
+router.patch('/:idMedicamento', medicamentoController.updateById); // Actualizar un medicamento por su ID (utilizando PATCH)
+router.delete('/:idMedicamento', medicamentoController.deleteById); // Eliminar un medicamento por su ID
 
 // Exportar el router
 module.exports = router;

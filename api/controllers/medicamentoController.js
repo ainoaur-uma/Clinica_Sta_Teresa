@@ -1,137 +1,171 @@
-// Importar el modelo
 const medicamentoModel = require('../models/medicamentoModel');
 
-// Validar los datos del medicamento
-const validarMedicamento = (medicamento) => {
-  const errores = [];
-  if (!medicamento.nombre_medicamento) {
-    errores.push('El nombre del medicamento es requerido.');
-  }
-  return errores;
-};
-
-// Crea un nuevo medicamento:
-exports.create = (req, res) => {
-  const nuevoMedicamento = {
-    nombre_medicamento: req.body.nombre_medicamento,
-    principio_activo: req.body.principio_activo,
-    descripcion_medicamento: req.body.descripcion_medicamento,
-    fecha_caducidad: req.body.fecha_caducidad,
-    forma_dispensacion: req.body.forma_dispensacion,
-  };
-  const errores = validarMedicamento(nuevoMedicamento);
-  if (errores.length > 0) {
-    return res.status(400).json({ mensaje: 'Errores de validación', errores });
-  }
-
-  medicamentoModel.create(nuevoMedicamento, (err, medicamento) => {
-    if (err) {
-      let mensajeError = 'Error al crear el medicamento';
-      if (err.code === 'ER_DUP_ENTRY') {
-        mensajeError = 'El medicamento ya existe';
-      }
-      return res
+const medicamentoController = {
+  /**
+   * Crea un nuevo medicamento. Valida y recibe los datos del medicamento desde el cuerpo de la solicitud HTTP.
+   * Si la creación es exitosa, devuelve una respuesta con estado 201 y los datos del medicamento creado.
+   * En caso de error, envía una respuesta con estado 500 y los detalles del error.
+   */
+  async create(req, res) {
+    try {
+      const nuevoMedicamento = req.body;
+      const medicamentoCreado = await medicamentoModel.create(nuevoMedicamento);
+      res.status(201).json(medicamentoCreado);
+    } catch (err) {
+      res
         .status(500)
-        .json({ mensaje: mensajeError, error: err.sqlMessage });
+        .json({ mensaje: 'Error al crear el medicamento', error: err.message });
     }
-    res.status(201).json(medicamento);
-  });
-};
+  },
 
-// Obtiene todos los medicamentos de la base de datos
-exports.findAll = (req, res) => {
-  medicamentoModel.getAll((err, medicamentos) => {
-    if (err) {
-      console.error('Error al obtener todos los medicamentos:', err);
-      return res.status(500).json({
-        mensaje: 'Error al obtener todos los medicamentos',
-        error: err.sqlMessage,
+  /**
+   * Recupera todos los medicamentos de la base de datos. No requiere parámetros.
+   * Devuelve una lista de medicamentos con una respuesta de estado 200.
+   * En caso de error, envía una respuesta con estado 500 y los detalles del error.
+   */
+  async findAll(req, res) {
+    try {
+      const medicamentos = await medicamentoModel.getAll();
+      res.status(200).json(medicamentos);
+    } catch (err) {
+      res
+        .status(500)
+        .json({ mensaje: 'Error al obtener medicamentos', error: err.message });
+    }
+  },
+
+  /**
+   * Este método obtiene un medicamento específico por su ID. El ID se obtiene de los parámetros de la solicitud HTTP.
+   * Devuelve los datos del medicamento con una respuesta de estado 200 si se encuentra.
+   * En caso de no encontrar el medicamento, devuelve un estado 404.
+   * En caso de error en la consulta, envía una respuesta con estado 500 y los detalles del error.
+   */
+  async findOne(req, res) {
+    const idMedicamento = req.params.medicamentoId;
+    try {
+      const medicamento = await medicamentoModel.findById(idMedicamento);
+      if (!medicamento) {
+        return res.status(404).json({
+          mensaje: `Medicamento con ID ${idMedicamento} no encontrado`,
+        });
+      }
+      res.status(200).json(medicamento);
+    } catch (err) {
+      res.status(500).json({
+        mensaje: `Error al obtener el medicamento con ID ${idMedicamento}`,
+        error: err.message,
       });
     }
-    return res.status(200).json(medicamentos);
-  });
-};
+  },
 
-// Obtiene un medicamento por su ID
-exports.findOne = (req, res) => {
-  const medicamentoId = req.params.medicamentoId;
-  if (!medicamentoId) {
-    return res
-      .status(400)
-      .json({ mensaje: 'ID de medicamento no proporcionado' });
-  }
-
-  medicamentoModel.findById(medicamentoId, (err, medicamento) => {
-    if (err) {
-      console.error('Error al obtener el medicamento por su ID:', err);
-      return res.status(500).json({
-        tipo: 'Error en la consulta',
-        mensaje: `Error al obtener el medicamento con ID ${medicamentoId}`,
-        error: err.sqlMessage,
+  /**
+   * Este método busca y devuelve medicamentos basados en su nombre. El nombre se obtiene de los parámetros
+   * de la ruta de la solicitud HTTP. Se hace una llamada al método 'findByNombre' del modelo de medicamento para realizar la búsqueda.
+   * Si se encuentran medicamentos, se devuelve un arreglo de objetos medicamento con una respuesta de estado 200.
+   * Si no se encuentran medicamentos con ese nombre, se devuelve una respuesta de estado 404 con el mensaje 'Medicamento no encontrado'.
+   * En caso de un error durante la búsqueda, se devuelve una respuesta de estado 500 con los detalles del error.
+   */
+  async findByNombre(req, res) {
+    try {
+      const nombreMedicamento = req.params.nombreMedicamento;
+      const medicamentos = await medicamentoModel.findByNombre(
+        nombreMedicamento
+      );
+      if (medicamentos.length === 0) {
+        return res.status(404).json({
+          mensaje: `Medicamentos con nombre ${nombreMedicamento} no encontrados`,
+        });
+      }
+      res.status(200).json(medicamentos);
+    } catch (error) {
+      res.status(500).json({
+        mensaje: `Error al buscar medicamentos por nombre ${nombreMedicamento}`,
+        error: error.message,
       });
     }
-    if (!medicamento) {
-      return res.status(404).json({ mensaje: 'Medicamento no encontrado' });
-    }
-    return res.status(200).json(medicamento);
-  });
-};
+  },
 
-// Actualiza un medicamento por su ID utilizando PATCH
-exports.update = (req, res) => {
-  const medicamentoId = req.params.medicamentoId;
-  const updatedData = req.body;
-  const errores = validarMedicamento(updatedData);
-  if (errores.length > 0) {
-    return res.status(400).json({ mensaje: 'Errores de validación', errores });
-  }
-  medicamentoModel.updateById(medicamentoId, updatedData, (err, result) => {
-    if (err) {
-      console.error('Error al actualizar el medicamento por su ID:', err);
-      return res.status(500).json({
-        mensaje: 'Error al actualizar el medicamento por su ID',
-        error: err.sqlMessage,
+  /**
+   * Este método busca medicamentos por su principio activo. El principio activo se obtiene de los parámetros de la ruta de la solicitud HTTP.
+   * Devuelve una lista de medicamentos que coinciden con el principio activo proporcionado con una respuesta de estado 200.
+   * En caso de no encontrar medicamentos con ese principio activo, devuelve un estado 404.
+   * En caso de error durante la búsqueda, envía una respuesta con estado 500 y los detalles del error.
+   */
+  async findByPrincipioActivo(req, res) {
+    try {
+      const principioActivo = req.params.principioActivo;
+      const medicamentos = await medicamentoModel.findByPrincipioActivo(
+        principioActivo
+      );
+      if (medicamentos.length === 0) {
+        return res.status(404).json({
+          mensaje: `No se encontraron medicamentos con el principio activo ${principioActivo}`,
+        });
+      }
+      res.status(200).json(medicamentos);
+    } catch (error) {
+      res.status(500).json({
+        mensaje: `Error al buscar medicamentos por principio activo ${principioActivo}`,
+        error: error.message,
       });
     }
+  },
 
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ mensaje: 'Medicamento no encontrado' });
-    }
-
-    return res.status(200).json({
-      mensaje: `Medicamento con ID ${medicamentoId} actualizado exitosamente`,
-    });
-  });
-};
-
-// Elimina un medicamento por su ID
-exports.delete = (req, res) => {
-  const medicamentoId = req.params.medicamentoId;
-
-  medicamentoModel.remove(medicamentoId, (err, result) => {
-    if (err) {
-      console.error('Error al eliminar el medicamento por su ID:', err);
-      return res.status(500).json({
-        mensaje: `Error al eliminar el medicamento con ID ${medicamentoId}`,
-        error: err.sqlMessage,
+  /**
+   * Este método actualiza un medicamento específico por su ID(idMedicamento) con los datos proporcionados en el cuerpo de la solicitud HTTP.
+   * Si la actualización es exitosa, devuelve una respuesta con estado 200 y un mensaje de éxito.
+   * En caso de no encontrar el medicamento, devuelve un estado 404.
+   * En caso de error durante la actualización, envía una respuesta con estado 500 y los detalles del error.
+   */
+  async updateById(req, res) {
+    const idMedicamento = req.params.idMedicamento;
+    const updatedData = req.body;
+    try {
+      const result = await medicamentoModel.updateById(
+        idMedicamento,
+        updatedData
+      );
+      if (result.affectedRows === 0) {
+        return res.status(404).json({
+          mensaje: `Medicamento con ID ${idMedicamento} no encontrado`,
+        });
+      }
+      res.status(200).json({
+        mensaje: `Medicamento con ID ${idMedicamento} actualizado exitosamente`,
+      });
+    } catch (err) {
+      res.status(500).json({
+        mensaje: `Error al actualizar el medicamento con ID ${idMedicamento}`,
+        error: err.message,
       });
     }
+  },
 
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ mensaje: 'Medicamento no encontrado' });
+  /**
+   * Elimina un medicamento específico por su ID(idMedicamtno). El idMedicamento se obtiene de los parámetros de la solicitud HTTP.
+   * Si la eliminación es exitosa, devuelve una respuesta con estado 200 y un mensaje de éxito.
+   * En caso de no encontrar el medicamento a eliminar, devuelve un estado 404.
+   * En caso de error durante la eliminación, envía una respuesta con estado 500 y los detalles del error.
+   */
+  async deleteById(req, res) {
+    const idMedicamento = req.params.idMedicamento;
+    try {
+      const result = await medicamentoModel.removeById(idMedicamento);
+      if (result.affectedRows === 0) {
+        return res.status(404).json({
+          mensaje: `Medicamento con ID ${idMedicamento} no encontrado`,
+        });
+      }
+      res.status(200).json({
+        mensaje: `Medicamento con ID ${idMedicamento} eliminado exitosamente`,
+      });
+    } catch (err) {
+      res.status(500).json({
+        mensaje: `Error al eliminar el medicamento con ID ${idMedicamento}`,
+        error: err.message,
+      });
     }
-
-    return res.status(200).json({
-      mensaje: `Medicamento con ID ${medicamentoId}eliminado exitosamente`,
-    });
-  });
+  },
 };
 
-// Exportamos las funciones del controlador
-module.exports = {
-  create: exports.create,
-  findAll: exports.findAll,
-  findOne: exports.findOne,
-  update: exports.update,
-  delete: exports.delete,
-};
+module.exports = medicamentoController;

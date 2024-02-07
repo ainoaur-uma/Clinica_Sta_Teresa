@@ -47,10 +47,10 @@ const hceController = {
    * En caso de no encontrar la HCE para el paciente, devuelve un estado 404.
    * En caso de error en la consulta, envía una respuesta con estado 500 y los detalles del error.
    */
-  async findByPacienteNHC(req, res) {
+  async findByNHC(req, res) {
     const NHC_paciente = req.params.NHC_paciente;
     try {
-      const hce = await hceModel.findByPacienteNHC(NHC_paciente);
+      const hce = await hceModel.findByNHC(NHC_paciente);
       if (!hce) {
         return res.status(404).json({
           mensaje: `No se encontró la HCE para el paciente con NHC ${NHC_paciente}`,
@@ -116,7 +116,9 @@ const hceController = {
       }
       res
         .status(200)
-        .json({ mensaje: `HCE con NHC ${nhc} eliminada exitosamente` });
+        .json({
+          mensaje: `HCE con NHC ${NHC_paciente} eliminada exitosamente`,
+        });
     } catch (err) {
       res.status(500).json({
         mensaje: `Error al eliminar la HCE del  NHC ${NHC_paciente}`,
