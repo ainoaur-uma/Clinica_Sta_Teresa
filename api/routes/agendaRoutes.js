@@ -5,11 +5,12 @@ const router = express.Router();
 const agendaController = require('../controllers/agendaController');
 
 // Definición de rutas para la entidad agenda:
-router.post('/', agendaController.create); // Crear una nueva agenda
-router.get('/', agendaController.findAll); // Obtener todas las agendas
-router.get('/:idAgenda', agendaController.findOne); // Obtener una agenda por su ID
-router.patch('/:idAgenda', agendaController.update); // Actualizar una agenda por su ID (utilizando PATCH)
-router.delete('/:idAgenda', agendaController.delete); // Eliminar una agenda por su ID
+router.post('/', agendaController.create); // Crea una nueva entrada en la agenda
+router.get('/', agendaController.findAll); // Obtiene todas las entradas de la agenda
+router.get('/:idAgenda', agendaController.findOne); // Obtiene una entrada de la agenda por su ID
+router.get('/descripcion/:descripcion', agendaController.findByDescripcion); // Busca agendas por descripción
+router.patch('/:idAgenda', agendaController.updateById); // Actualiza una entrada en la agenda por su ID
+router.delete('/:idAgenda', agendaController.deleteById); // Elimina una entrada en la agenda por su ID
 
 // Exportar el router
 module.exports = router;

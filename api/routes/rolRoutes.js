@@ -5,11 +5,12 @@ const router = express.Router();
 const rolController = require('../controllers/rolController');
 
 // Definición de rutas para la entidad rol:
-router.post('/', rolController.create); //crear un nuevo rol
-router.get('/', rolController.findAll); //obtener todos los roles
-router.get('/:rolId', rolController.findOne); // obtener un rol por su ID
-router.patch('/:rolId', rolController.update); //actualizar un rol por su ID (utilizando PATCH)
-router.delete('/:rolId', rolController.delete); //eliminar un rol por su ID
+router.post('/', rolController.create); // Crear un nuevo rol
+router.get('/', rolController.findAll); // Obtener todos los roles
+router.get('/:idRol', rolController.findOne); // Obtener un rol por su ID
+router.get('/descripcion/:descripcion', rolController.findByDescripcion); // Obtener roles por descripción
+router.patch('/:idRol', rolController.updateById); // Actualizar un rol por su ID
+router.delete('/:idRol', rolController.deleteById); // Eliminar un rol por su ID
 
 // Exportar el router
 module.exports = router;

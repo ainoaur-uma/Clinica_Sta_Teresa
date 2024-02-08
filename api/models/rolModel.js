@@ -1,111 +1,145 @@
-// Importar el pool de conexión a la base de datos
 const db = require('../../server/db_connection');
+const Joi = require('joi');
 
-// Definir el modelo para la entidad rol
-const rolModel = function (rol) {
-  this.idRol = rol.idRol;
-  this.descripcion_rol = rol.descripcion_rol;
-};
+// Esquema de validación para la creación de un rol
+const rolSchema = Joi.object({
+  descripcion_rol: Joi.string().max(50).required(),
+});
 
-// Crear un nuevo rol
-rolModel.create = (nuevoRol, resultado) => {
-  db.query('INSERT INTO rol SET ?', nuevoRol, (err, res) => {
-    if (err) {
-      console.error('Error al crear el rol:', err);
-      resultado(
-        { error: 'Error al crear rol', detalles: err.sqlMessage },
-        null
+const RolModel = {
+  /**
+   * Este método crea un nuevo rol en la base de datos.
+   * Valida los datos de entrada con rolSchema antes de la inserción para asegurar que todos los campos requeridos estén presentes y sean válidos.
+   * Si los datos son válidos, inserta el nuevo rol en la base de datos y devuelve el rol creado con su ID.
+   * En caso de error de validación o inserción, lanza una excepción con el mensaje de error correspondiente.
+   */
+  async create(descripcionRol) {
+    const { error, value } = rolSchema.validate({
+      descripcion_rol: descripcionRol,
+    });
+    if (error)
+      throw new Error(
+        `Validación fallida: ${error.details.map((x) => x.message).join(', ')}`
       );
-      return;
-    }
-    resultado(null, { idRol: res.insertId, ...nuevoRol });
-  });
-};
 
-// Obtiene todos los roles
-rolModel.getAll = (resultado) => {
-  db.query('SELECT * FROM rol', (err, res) => {
-    if (err) {
-      console.error('Error al obtener los roles:', err);
-      resultado(
-        { error: 'Error al obtener roles', detalles: err.sqlMessage },
-        null
+    try {
+      const [res] = await db.query(
+        'INSERT INTO rol (descripcion_rol) VALUES (?)',
+        [value.descripcion_rol]
       );
-      return;
+      return { idRol: res.insertId, ...value };
+    } catch (err) {
+      throw new Error(`Error al crear el rol: ${err.message}`);
     }
-    resultado(null, res);
-  });
-};
+  },
 
-// Obtiene un rol por su ID
-rolModel.findById = (rolId, resultado) => {
-  db.query('SELECT * FROM rol WHERE idRol = ?', [rolId], (err, res) => {
-    if (err) {
-      console.error('Error al buscar el rol:', err);
-      resultado(
-        { error: 'Error al buscar rol', detalles: err.sqlMessage },
-        null
+  /**
+   * Este método obtiene todos los roles de la base de datos.
+   * Realiza una consulta para recuperar todos los registros de la tabla rol.
+   * No requiere validación de entrada y devuelve una lista de todos los roles.
+   * En caso de error durante la consulta, lanza una excepción con el mensaje de error correspondiente.
+   */
+  async getAll() {
+    try {
+      const [roles] = await db.query('SELECT * FROM rol');
+      return roles;
+    } catch (err) {
+      throw new Error(`Error al obtener los roles: ${err.message}`);
+    }
+  },
+
+  /**
+   * Este método busca un rol por su ID.
+   * Utiliza validación para asegurar que el idRol es un número entero válido antes de realizar la consulta.
+   * Si el rol es encontrado, devuelve los detalles del rol. Si no se encuentra, lanza un error especificando que el rol no fue encontrado.
+   * En caso de error en la consulta, lanza una excepción con el mensaje de error correspondiente.
+   */
+  async findById(idRol) {
+    try {
+      const [rol] = await db.query('SELECT * FROM rol WHERE idRol = ?', [
+        idRol,
+      ]);
+      if (rol.length === 0) throw new Error('Rol no encontrado');
+      return rol[0];
+    } catch (err) {
+      throw new Error(`Error al buscar el rol: ${err.message}`);
+    }
+  },
+
+  /**
+   * Este método busca un rol por su descripción.
+   * Valida que la descripción proporcionada sea una cadena de caracteres válida antes de realizar la consulta.
+   * Si encuentra uno o más roles que coinciden con la descripción proporcionada, devuelve los detalles de estos roles.
+   * Si no se encuentra ningún rol con esa descripción, lanza un error especificando que no se encontraron roles con esa descripción.
+   * En caso de error durante la consulta, lanza una excepción con el mensaje de error correspondiente.
+   */
+  async findByDescripcion(descripcion) {
+    const { error } = Joi.string().max(100).required().validate(descripcion);
+    if (error) throw new Error('La descripción proporcionada es inválida.');
+
+    try {
+      const [res] = await db.query(
+        'SELECT * FROM rol WHERE descripcion_rol = ?',
+        [descripcion]
       );
-      return;
-    }
-    if (res.length) {
-      resultado(null, res[0]);
-    } else {
-      resultado({ tipo: 'Rol no encontrado' }, null);
-    }
-  });
-};
-
-// Actualiza un rol por su ID
-rolModel.updateById = (id, rol, resultado) => {
-  const updateFields = {};
-  if ('descripcion_rol' in rol)
-    updateFields.descripcion_rol = rol.descripcion_rol;
-
-  if (Object.keys(updateFields).length === 0) {
-    resultado({ tipo: 'Nada que actualizar' }, null);
-    return;
-  }
-
-  db.query(
-    'UPDATE rol SET ? WHERE idRol = ?',
-    [updateFields, id],
-    (err, res) => {
-      if (err) {
-        console.error('Error al actualizar el rol:', err);
-        resultado(
-          { error: 'Error al actualizar rol', detalles: err.sqlMessage },
-          null
+      if (res.length === 0)
+        throw new Error(
+          'No se encontraron roles con la descripción proporcionada.'
         );
-        return;
-      }
-      if (res.affectedRows === 0) {
-        resultado({ tipo: 'Rol no encontrado' }, null);
-      } else {
-        resultado(null, { idRol: id, ...updateFields });
-      }
+      return res;
+    } catch (err) {
+      throw new Error('Error al buscar roles por descripción: ' + err.message);
     }
-  );
-};
+  },
 
-// Elimina un rol por su ID
-rolModel.remove = (id, resultado) => {
-  db.query('DELETE FROM rol WHERE idRol = ?', [id], (err, res) => {
-    if (err) {
-      console.error('Error al eliminar el rol:', err);
-      resultado(
-        { error: 'Error al eliminar rol', detalles: err.sqlMessage },
-        null
+  /**
+   * Este método actualiza un rol existente por su ID(idRol) con los datos proporcionados.
+   * Valida los datos de entrada con rolSchema para asegurar que el campo de descripción es válido.
+   * Si la actualización es exitosa, devuelve el número de filas afectadas.
+   * Si el rol no se encuentra o no hay cambios necesarios, lanza un error específico.
+   * En caso de error durante la actualización, lanza una excepción con el mensaje de error correspondiente.
+   */
+  async updateById(idRol, descripcionRol) {
+    const { error, value } = rolSchema.validate({
+      descripcion_rol: descripcionRol,
+    });
+    if (error)
+      throw new Error(
+        `Validación fallida: ${error.details.map((x) => x.message).join(', ')}`
       );
-      return;
+
+    try {
+      const [res] = await db.query(
+        'UPDATE rol SET descripcion_rol = ? WHERE idRol = ?',
+        [value.descripcion_rol, idRol]
+      );
+      if (res.affectedRows === 0)
+        throw new Error('Rol no encontrado o sin cambios necesarios');
+      return { affectedRows: res.affectedRows };
+    } catch (err) {
+      throw new Error(`Error al actualizar el rol: ${err.message}`);
     }
-    if (res.affectedRows === 0) {
-      resultado({ tipo: 'Rol no encontrado' }, null);
-    } else {
-      resultado(null, res);
+  },
+
+  /**
+   * Este método elimina un rol por su ID (idRol).
+   * Valida que el idRol sea un número entero válido antes de realizar la eliminación.
+   * Si el rol se elimina con éxito, devuelve el número de filas afectadas.
+   * Si el rol no se encuentra, lanza un error específico indicando que el rol no fue encontrado.
+   * En caso de error durante la eliminación, lanza una excepción con el mensaje de error correspondiente.
+   */
+  async removeById(idRol) {
+    const { error } = Joi.number().integer().required().validate(idRol);
+    if (error) throw new Error('El ID del rol proporcionado es inválido.');
+
+    try {
+      const [res] = await db.query('DELETE FROM rol WHERE idRol = ?', [idRol]);
+      if (res.affectedRows === 0) throw new Error('Rol no encontrado.');
+      return { affectedRows: res.affectedRows };
+    } catch (err) {
+      throw new Error(`Error al eliminar el rol: ${err.message}`);
     }
-  });
+  },
 };
 
-// Exportar el modelo
-module.exports = rolModel;
+module.exports = RolModel;

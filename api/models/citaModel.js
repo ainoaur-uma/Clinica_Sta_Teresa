@@ -1,143 +1,283 @@
 const db = require('../../server/db_connection');
+const Joi = require('joi');
+const pacienteModel = require('./pacienteModel');
+const usuarioModel = require('./usuarioModel');
 
-// Define el modelo para la entidad de cita
-const citaModel = function (cita) {
-  this.idCita = cita.idCita;
-  this.fecha = cita.fecha;
-  this.hora = cita.hora;
-  this.NHC_paciente = cita.NHC_paciente;
-  this.doctor_id = cita.doctor_id;
-  this.agenda_id = cita.agenda_id;
-  this.informacion_cita = cita.informacion_cita;
-};
+// Esquema de validación para la creación de una cita
+const citaSchema = Joi.object({
+  fecha: Joi.date().required(),
+  hora: Joi.string().required(),
+  NHC_paciente: Joi.number().integer().required(),
+  doctor_id: Joi.number().integer().required(),
+  agenda_id: Joi.number().integer().required(),
+  informacion_cita: Joi.string().allow('').optional(),
+});
 
-// Crea una nueva cita
-citaModel.create = (nuevaCita, resultado) => {
-  db.query('INSERT INTO cita SET ?', nuevaCita, (err, res) => {
-    if (err) {
-      console.error('Error al crear la cita:', err);
-      resultado(
-        { error: 'Error al crear cita', detalles: err.sqlMessage },
-        null
+// Esquema de validación para actualización parcial con PATCH
+const citaSchemaUpdate = Joi.object({
+  fecha: Joi.date().optional(),
+  hora: Joi.string().optional(),
+  NHC_paciente: Joi.number().integer().optional(),
+  doctor_id: Joi.number().integer().optional(),
+  agenda_id: Joi.number().integer().optional(),
+  informacion_cita: Joi.string().allow('').optional(),
+}).min(1); // Requiere al menos un campo para la actualización
+
+const citaModel = {
+  /**
+   * Crea una nueva cita en la base de datos.
+   * Primero verifica que el paciente, el usuario y la agenda existan en la base de datos. Después, valida los datos de entrada con citaSchema antes de la inserción para asegurar que todos los campos requeridos estén presentes y sean válidos.
+   * Si los datos son válidos, inserta la nueva entrada en la base de datos y devuelve los detalles de la agenda creada.
+   * En caso de error de validación o inserción, lanza una excepción con el mensaje de error correspondiente.
+   */
+  async create(nuevaCita) {
+    const { error, value } = citaSchema.validate(nuevaCita);
+    if (error) {
+      throw new Error(
+        `Validación fallida: ${error.details.map((x) => x.message).join(', ')}`
       );
-      return;
     }
-    resultado(null, { idCita: res.insertId, ...nuevaCita });
-  });
-};
 
-// Obtiene todas las citas
-citaModel.getAll = (resultado) => {
-  db.query('SELECT * FROM cita', (err, res) => {
-    if (err) {
-      console.error('Error al obtener citas:', err);
-      resultado(
-        { error: 'Error al obtener citas', detalles: err.sqlMessage },
-        null
+    const pacienteExistente = await db.query(
+      'SELECT * FROM paciente WHERE NHC = ?',
+      [value.NHC_paciente]
+    );
+    if (pacienteExistente[0].length === 0) {
+      throw new Error('El paciente no existe.');
+    }
+
+    const doctorExistente = await db.query(
+      'SELECT * FROM usuario WHERE idUsuario = ?',
+      [value.doctor_id]
+    );
+    if (doctorExistente[0].length === 0) {
+      throw new Error('El doctor (usuario) no existe.');
+    }
+
+    const agendaExistente = await db.query(
+      'SELECT * FROM agenda WHERE idAgenda = ?',
+      [value.agenda_id]
+    );
+    if (agendaExistente[0].length === 0) {
+      throw new Error('La agenda no existe.');
+    }
+
+    try {
+      const [res] = await db.query('INSERT INTO cita SET ?', value);
+      return { idCita: res.insertId, ...value };
+    } catch (err) {
+      throw new Error(`Error al crear la cita: ${err.message}`);
+    }
+  },
+
+  /**
+   * Obtiene todas las citas de la base de datos.
+   * No requiere validación de entrada.
+   * En caso de error durante la consulta, lanza una excepción con el mensaje de error correspondiente.
+   */
+  async getAll() {
+    try {
+      const [citas] = await db.query('SELECT * FROM cita');
+      return citas;
+    } catch (err) {
+      throw new Error(`Error al obtener las citas: ${err.message}`);
+    }
+  },
+
+  /**
+   * Busca una cita específica por su ID(idCita)
+   * Utiliza validación para asegurar que el idCita es un número entero válido antes de realizar la consulta.
+   * Si la agenda es encontrada, devuelve los detalles de la entrada. Si no se encuentra, lanza un error especificando que la agenda no fue encontrada.
+   * En caso de error en la consulta, lanza una excepción con el mensaje de error correspondiente.
+   */
+  async findById(idCita) {
+    const { error } = Joi.number().integer().required().validate(idCita);
+    if (error) {
+      throw new Error('El ID de la cita proporcionado es inválido.');
+    }
+
+    try {
+      const [cita] = await db.query('SELECT * FROM cita WHERE idCita = ?', [
+        idCita,
+      ]);
+      if (cita.length === 0) throw new Error('Cita no encontrada');
+      return cita[0];
+    } catch (err) {
+      throw new Error(`Error al buscar la cita: ${err.message}`);
+    }
+  },
+
+  /**
+   * Busca las citas de un paciente por su NHC
+   * Valida que la descripción proporcionada sea una cadena no vacía antes de realizar la consulta.
+   * Devuelve todas las citas que coinciden con el nhc .
+   * Si no se encuentran agendas, lanza un error especificando que no se encontraron agendas con esa descripción.
+   */
+  async findByNhc(NHC_paciente) {
+    const { error } = Joi.number().integer().required().validate(NHC_paciente);
+    if (error) {
+      throw new Error('El NHC proporcionado es inválido.');
+    }
+
+    try {
+      const [citas] = await db.query(
+        'SELECT * FROM cita WHERE NHC_paciente = ?',
+        [NHC_paciente]
       );
-      return;
-    }
-    resultado(null, res);
-  });
-};
-
-// Obtiene una cita por su ID
-citaModel.findById = (idCita, resultado) => {
-  db.query('SELECT * FROM cita WHERE idCita = ?', [idCita], (err, res) => {
-    if (err) {
-      console.error('Error al buscar la cita:', err);
-      resultado(
-        { error: 'Error al buscar cita', detalles: err.sqlMessage },
-        null
-      );
-      return;
-    }
-    if (res.length) {
-      resultado(null, res[0]);
-    } else {
-      resultado({ tipo: 'Cita no encontrada' }, null);
-    }
-  });
-};
-
-// Obtiene todas las citas de un paciente por su NHC
-citaModel.findByPacienteNHC = (NHC_paciente, resultado) => {
-  db.query(
-    'SELECT * FROM cita WHERE NHC_paciente = ?',
-    [NHC_paciente],
-    (err, res) => {
-      if (err) {
-        console.error('Error al buscar citas por NHC del paciente:', err);
-        resultado(
-          { error: 'Error al buscar citas por NHC', detalles: err.sqlMessage },
-          null
+      if (citas.length === 0)
+        throw new Error(
+          'No se encontraron citas para el paciente especificado.'
         );
-        return;
-      }
-      if (res.length) {
-        resultado(null, res);
-      } else {
-        resultado({ tipo: 'No se encontraron citas para el paciente' }, null);
-      }
-    }
-  );
-};
-
-// Actualiza una cita por su ID
-citaModel.updateById = (id, cita, resultado) => {
-  const updateFields = {};
-  if ('fecha' in cita) updateFields.fecha = cita.fecha;
-  if ('hora' in cita) updateFields.hora = cita.hora;
-  if ('NHC_paciente' in cita) updateFields.NHC_paciente = cita.NHC_paciente;
-  if ('doctor_id' in cita) updateFields.doctor_id = cita.doctor_id;
-  if ('agenda_id' in cita) updateFields.agenda_id = cita.agenda_id;
-  if ('informacion_cita' in cita)
-    updateFields.informacion_cita = cita.informacion_cita;
-
-  if (Object.keys(updateFields).length === 0) {
-    resultado({ tipo: 'Nada que actualizar' }, null);
-    return;
-  }
-
-  db.query(
-    'UPDATE cita SET ? WHERE idCita = ?',
-    [updateFields, id],
-    (err, res) => {
-      if (err) {
-        console.error('Error al actualizar la cita:', err);
-        resultado(
-          { error: 'Error al actualizar cita', detalles: err.sqlMessage },
-          null
-        );
-        return;
-      }
-      if (res.affectedRows === 0) {
-        resultado({ tipo: 'Cita no encontrada' }, null);
-      } else {
-        resultado(null, { idCita: id, ...updateFields });
-      }
-    }
-  );
-};
-
-// Elimina una cita por su ID
-citaModel.remove = (id, resultado) => {
-  db.query('DELETE FROM cita WHERE idCita = ?', [id], (err, res) => {
-    if (err) {
-      console.error('Error al eliminar la cita:', err);
-      resultado(
-        { error: 'Error al eliminar cita', detalles: err.sqlMessage },
-        null
+      return citas;
+    } catch (err) {
+      throw new Error(
+        `Error al buscar citas por NHC del paciente: ${err.message}`
       );
-      return;
     }
-    if (res.affectedRows === 0) {
-      resultado({ tipo: 'Cita no encontrada' }, null);
-    } else {
-      resultado(null, res);
+  },
+
+  /**
+   * Busca las citas de un usuario específico por el id del usuario (idUsuario)
+   * Valida que la descripción proporcionada sea una cadena no vacía antes de realizar la consulta.
+   * Devuelve todas las citas que coinciden con el nhc .
+   * Si no se encuentran agendas, lanza un error especificando que no se encontraron agendas con esa descripción.
+   */
+  async findByUsuarioId(doctor_id) {
+    const { error } = Joi.number().integer().required().validate(doctor_id);
+    if (error) {
+      throw new Error('El ID del usuario proporcionado es inválido.');
     }
-  });
+
+    try {
+      const [citas] = await db.query(
+        `
+        SELECT cita.* FROM cita
+        INNER JOIN usuario ON cita.doctor_id = usuario.idUsuario
+        WHERE usuario.idUsuario = ?
+      `,
+        [doctor_id]
+      );
+
+      if (citas.length === 0)
+        throw new Error('No se encontraron citas para el doctor especificado.');
+      return citas;
+    } catch (err) {
+      throw new Error(
+        `Error al buscar citas por ID del doctor: ${err.message}`
+      );
+    }
+  },
+
+  /**
+   * Busca las citas de una agenda específica por el id de la Agenda
+   * Valida que la descripción proporcionada sea una cadena no vacía antes de realizar la consulta.
+   * Devuelve todas las citas que son de la misma agenda
+   * Si no se encuentran agendas, lanza un error especificando que no se encontraron agendas con esa descripción.
+   */
+
+  async findByAgendaId(agenda_id) {
+    const { error } = Joi.number().integer().required().validate(agenda_id);
+    if (error) {
+      throw new Error('El ID de la agenda proporcionado es inválido.');
+    }
+
+    try {
+      const [citas] = await db.query('SELECT * FROM cita WHERE agenda_id = ?', [
+        agenda_id,
+      ]);
+      if (citas.length === 0)
+        throw new Error('No se encontraron citas para la agenda especificada.');
+      return citas;
+    } catch (err) {
+      throw new Error(
+        `Error al buscar citas por ID de la agenda: ${err.message}`
+      );
+    }
+  },
+
+  /**
+   * Busca las citas de una agenda específica por el nombre de la Agenda
+   * Valida que la descripción proporcionada sea una cadena no vacía antes de realizar la consulta.
+   * Devuelve todas las citas que son de la misma agenda
+   * Si no se encuentran agendas, lanza un error especificando que no se encontraron agendas con esa descripción.
+   */
+  async findByNombreAgenda(nombreAgenda) {
+    const { error } = Joi.string().required().validate(nombreAgenda);
+    if (error) {
+      throw new Error('El nombre de la agenda proporcionado es inválido.');
+    }
+
+    try {
+      const [citas] = await db.query(
+        `
+        SELECT cita.* FROM cita
+        INNER JOIN agenda ON cita.agenda_id = agenda.idAgenda
+        WHERE agenda.descripcion LIKE ?
+      `,
+        [`%${nombreAgenda}%`]
+      );
+
+      if (citas.length === 0)
+        throw new Error(
+          'No se encontraron citas con el nombre de agenda especificado.'
+        );
+      return citas;
+    } catch (err) {
+      throw new Error(
+        `Error al buscar citas por nombre de la agenda: ${err.message}`
+      );
+    }
+  },
+
+  /**
+   * Actualiza una cita por su ID (idCita) utilizando los datos proporcionados.
+   * Valida los datos de entrada con `citaSchemaUpdate` asegurando que al menos un campo sea proporcionado para la actualización.
+   * Si no se encuentran cambios o la agenda no existe, lanza un error específico.
+   */
+  async updateById(idCita, datosCita) {
+    const { error, value } = citaSchemaUpdate.validate(datosCita);
+    if (error) {
+      throw new Error(
+        `Validación fallida: ${error.details.map((x) => x.message).join(', ')}`
+      );
+    }
+
+    try {
+      const [res] = await db.query('UPDATE cita SET ? WHERE idCita = ?', [
+        value,
+        idCita,
+      ]);
+      if (res.affectedRows === 0)
+        throw new Error('Cita no encontrada o sin cambios necesarios');
+      return { affectedRows: res.affectedRows };
+    } catch (err) {
+      throw new Error(`Error al actualizar la cita: ${err.message}`);
+    }
+  },
+
+  /**
+   * Elimina una cita por su ID(idCita).
+   * Valida que el idCita sea un número entero válido antes de realizar la eliminación.
+   * Si la eliminación es exitosa, devuelve el número de filas afectadas.
+   * Si la agenda no se encuentra, lanza un error específico indicando que la agenda no fue encontrada.
+   * En caso de error durante la eliminación, lanza una excepción con el mensaje de error correspondiente.
+   */
+  async removeById(idCita) {
+    const { error } = Joi.number().integer().required().validate(idCita);
+    if (error) {
+      throw new Error('El ID de la cita proporcionado es inválido.');
+    }
+
+    try {
+      const [res] = await db.query('DELETE FROM cita WHERE idCita = ?', [
+        idCita,
+      ]);
+      if (res.affectedRows === 0) throw new Error('Cita no encontrada');
+      return { affectedRows: res.affectedRows };
+    } catch (err) {
+      throw new Error(`Error al eliminar la cita: ${err.message}`);
+    }
+  },
 };
 
-// Exportar el modelo
 module.exports = citaModel;

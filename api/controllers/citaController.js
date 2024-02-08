@@ -1,234 +1,220 @@
-// Importar los modelos
-const citaModel = require('../models/citaModel');
-const pacienteModel = require('../models/pacienteModel');
-const usuarioModel = require('../models/usuarioModel');
-const agendaModel = require('../models/agendaModel');
+const CitaModel = require('../models/citaModel');
+const PacienteModel = require('../models/pacienteModel');
+const UsuarioModel = require('../models/usuarioModel');
+const AgendaModel = require('../models/agendaModel');
 
-// Validar los datos de la cita
-const validarCita = (cita, isUpdating = false) => {
-  const errores = [];
-  if (!isUpdating) {
-    // Validaciones para la creación (POST)
-    if (!cita.NHC_paciente) {
-      errores.push('El NHC del paciente es requerido.');
-    }
-    if (!cita.doctor_id) {
-      errores.push('El ID del médico es requerido.');
-    }
-    if (!cita.agenda_id) {
-      errores.push('El ID de la agenda es requerido.');
-    }
-  } else {
-    // Validaciones para la actualización (PATCH)
-    if ('NHC_paciente' in cita && !cita.NHC_paciente) {
-      errores.push('El NHC del paciente no puede estar vacío.');
-    }
-    if ('doctor_id' in cita && !cita.doctor_id) {
-      errores.push('El ID del médico no puede estar vacío.');
-    }
-    if ('agenda_id' in cita && !cita.agenda_id) {
-      errores.push('El ID de la agenda no puede estar vacío.');
-    }
-  }
-  return errores;
-};
+const citaController = {
+  /**
+   * Crea una nueva cita en la base de datos. Valida y recibe los datos desde el cuerpo de la solicitud HTTP.
+   * Realiza verificaciones para asegurarse de que el paciente, el usuario (doctor) y la agenda existan.
+   * Si la creación es exitosa, devuelve una respuesta con estado 201 y los datos de la cita creada.
+   * En caso de error, envía una respuesta con estado 500 y los detalles del error.
+   */
+  async create(req, res) {
+    try {
+      const nuevaCita = req.body;
+      await PacienteModel.findByNhc(nuevaCita.NHC_paciente);
+      await UsuarioModel.findById(nuevaCita.doctor_id);
+      await AgendaModel.findById(nuevaCita.agenda_id);
 
-// Verificar la existencia del paciente, médico y agenda
-const verificarExistenciaPacienteMedicoAgenda = (
-  nhc,
-  doctorId,
-  agendaId,
-  callback
-) => {
-  pacienteModel.findById(nhc, (err, paciente) => {
-    if (err || !paciente) {
-      callback({ tipo: 'Paciente no encontrado', nhc }, null);
-      return;
-    }
-
-    usuarioModel.findById(doctorId, (err, medico) => {
-      if (err || !medico) {
-        callback({ tipo: 'Médico no encontrado', idMedico: doctorId }, null);
-        return;
-      }
-
-      agendaModel.findById(agendaId, (err, agenda) => {
-        if (err || !agenda) {
-          callback({ tipo: 'Agenda no encontrada', idAgenda: agendaId }, null);
-          return;
-        }
-
-        callback(null, { paciente, medico, agenda });
-      });
-    });
-  });
-};
-
-// Crear una nueva cita
-exports.create = (req, res) => {
-  const nuevaCita = {
-    fecha: req.body.fecha,
-    hora: req.body.hora,
-    NHC_paciente: req.body.NHC_paciente,
-    doctor_id: req.body.doctor_id,
-    agenda_id: req.body.agenda_id,
-    informacion_cita: req.body.informacion_cita,
-  };
-
-  const errores = validarCita(nuevaCita);
-  if (errores.length > 0) {
-    return res.status(400).json({ mensaje: 'Errores de validación', errores });
-  }
-
-  verificarExistenciaPacienteMedicoAgenda(
-    nuevaCita.NHC_paciente,
-    nuevaCita.doctor_id,
-    nuevaCita.agenda_id,
-    (err, result) => {
-      if (err) {
-        return res
-          .status(404)
-          .json({ mensaje: `Error: ${err.tipo}`, error: err });
-      }
-
-      citaModel.create(nuevaCita, (err, cita) => {
-        if (err) {
-          console.error('Error al crear cita:', err);
-          return res
-            .status(500)
-            .json({ mensaje: 'Error al crear cita', error: err.sqlMessage });
-        }
-        res.status(201).json(cita);
+      const citaCreada = await CitaModel.create(nuevaCita);
+      res.status(201).json(citaCreada);
+    } catch (err) {
+      res.status(500).json({
+        mensaje: 'Error al crear la cita',
+        error: err.message,
       });
     }
-  );
-};
+  },
 
-// Obtener todas las citas
-exports.findAll = (req, res) => {
-  citaModel.getAll((err, citas) => {
-    if (err) {
-      console.error('Error al obtener citas:', err);
-      return res
-        .status(500)
-        .json({ mensaje: 'Error al obtener citas', error: err.sqlMessage });
-    }
-    res.status(200).json(citas);
-  });
-};
-
-// Obtener una cita por su ID
-exports.findOne = (req, res) => {
-  const idCita = req.params.idCita;
-  citaModel.findById(idCita, (err, cita) => {
-    if (err) {
-      console.error('Error al obtener cita:', err);
-      return res
-        .status(500)
-        .json({
-          mensaje: `Error al obtener cita con ID ${idCita}`,
-          error: err.sqlMessage,
-        });
-    }
-    if (!cita) {
-      return res.status(404).json({ mensaje: 'Cita no encontrada' });
-    }
-    res.status(200).json(cita);
-  });
-};
-
-// Obtener todas las citas de un paciente por su NHC
-exports.findByPacienteNHC = (req, res) => {
-  const nhc = req.params.NHC_paciente;
-  citaModel.findByPacienteNHC(nhc, (err, citas) => {
-    if (err) {
-      console.error('Error al obtener citas por NHC del paciente:', err);
-      return res
-        .status(500)
-        .json({
-          mensaje: `Error al obtener citas para el NHC ${nhc}`,
-          error: err.sqlMessage,
-        });
-    }
-    if (citas.length === 0) {
-      return res
-        .status(404)
-        .json({
-          mensaje: `No se encontraron citas para el paciente con NHC ${nhc}`,
-        });
-    }
-    res.status(200).json(citas);
-  });
-};
-
-// Actualizar una cita por su ID
-exports.update = (req, res) => {
-  const idCita = req.params.idCita;
-  const updatedData = req.body;
-
-  verificarExistenciaPacienteMedicoAgenda(
-    updatedData.NHC_paciente,
-    updatedData.doctor_id,
-    updatedData.agenda_id,
-    (err, result) => {
-      if (err) {
-        return res
-          .status(404)
-          .json({ mensaje: `Error en los datos proporcionados`, error: err });
-      }
-
-      const errores = validarCita(updatedData, true);
-      if (errores.length > 0) {
-        return res
-          .status(400)
-          .json({ mensaje: 'Errores de validación', errores });
-      }
-
-      citaModel.updateById(idCita, updatedData, (err, result) => {
-        if (err) {
-          console.error('Error al actualizar cita:', err);
-          return res
-            .status(500)
-            .json({
-              mensaje: 'Error al actualizar cita',
-              error: err.sqlMessage,
-            });
-        }
-        if (result.affectedRows === 0) {
-          return res.status(404).json({ mensaje: 'Cita no encontrada' });
-        }
-        res.status(200).json({ mensaje: 'Cita actualizada exitosamente' });
+  /**
+   * Recupera todas las citas de la base de datos. No requiere parámetros.
+   * Devuelve una lista de citas con una respuesta de estado 200.
+   * En caso de error, envía una respuesta con estado 500 y los detalles del error.
+   */
+  async findAll(req, res) {
+    try {
+      const citas = await CitaModel.getAll();
+      res.status(200).json(citas);
+    } catch (err) {
+      res.status(500).json({
+        mensaje: 'Error al obtener las citas',
+        error: err.message,
       });
     }
-  );
-};
+  },
 
-// Eliminar una cita por su ID
-exports.delete = (req, res) => {
-  const idCita = req.params.idCita;
-  citaModel.removeById(idCita, (err, result) => {
-    if (err) {
-      console.error('Error al eliminar cita:', err);
-      return res
-        .status(500)
-        .json({
-          mensaje: `Error al eliminar cita con ID ${idCita}`,
-          error: err.sqlMessage,
+  /**
+   * Obtiene una cita específica por su ID (idCita). El ID se obtiene de los parámetros de la solicitud HTTP.
+   * Devuelve los detalles de la cita con una respuesta de estado 200 si se encuentra.
+   * En caso de no encontrar la cita, devuelve un estado 404.
+   * En caso de error en la consulta, envía una respuesta con estado 500 y los detalles del error.
+   */
+  async findOne(req, res) {
+    const idCita = req.params.idCita;
+    try {
+      const cita = await CitaModel.findById(idCita);
+      if (!cita) {
+        return res.status(404).json({
+          mensaje: `Cita con ID ${idCita} no encontrada`,
         });
+      }
+      res.status(200).json(cita);
+    } catch (err) {
+      res.status(500).json({
+        mensaje: `Error al obtener la cita con ID ${idCita}`,
+        error: err.message,
+      });
     }
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ mensaje: 'Cita no encontrada' });
+  },
+
+  /**
+   * Busca todas las citas de un paciente específico por su NHC. Valida que el NHC sea un número entero válido.
+   * Si se encuentran citas, devuelve un arreglo con estas con una respuesta de estado 200.
+   * En caso de no encontrar citas para el paciente, devuelve un estado 404.
+   * En caso de error durante la búsqueda, envía una respuesta con estado 500 y los detalles del error.
+   */
+  async findByNhc(req, res) {
+    const NHC_paciente = req.params.NHC_paciente;
+    try {
+      const citas = await CitaModel.findByNhc(NHC_paciente);
+      if (citas.length === 0) {
+        return res.status(404).json({
+          mensaje: `No se encontraron citas para el paciente con NHC ${NHC_paciente}`,
+        });
+      }
+      res.status(200).json(citas);
+    } catch (err) {
+      res.status(500).json({
+        mensaje: `Error al buscar citas por NHC del paciente ${NHC_paciente}`,
+        error: err.message,
+      });
     }
-    res.status(200).json({ mensaje: 'Cita eliminada exitosamente' });
-  });
+  },
+
+  /**
+   * Busca todas las citas asociadas a un usuario específico, identificado por su ID de usuario (doctor). Valida que el ID sea un número entero válido.
+   * Devuelve un arreglo con las citas asociadas a ese usuario con una respuesta de estado 200.
+   * En caso de no encontrar citas, devuelve un estado 404.
+   * En caso de error durante la búsqueda, envía una respuesta con estado 500 y los detalles del error.
+   */
+  async findByUsuarioId(req, res) {
+    const doctor_id = req.params.doctor_id;
+    try {
+      const citas = await CitaModel.findByUsuarioId(doctor_id);
+      if (citas.length === 0) {
+        return res.status(404).json({
+          mensaje: `No se encontraron citas para el doctor con ID ${doctor_id}`,
+        });
+      }
+      res.status(200).json(citas);
+    } catch (err) {
+      res.status(500).json({
+        mensaje: `Error al buscar citas por ID del doctor ${doctor_id}`,
+        error: err.message,
+      });
+    }
+  },
+
+  /**
+   * Obtiene todas las citas asociadas a una agenda específica mediante el ID de la agenda. Valida que el ID de la agenda sea un número entero válido.
+   * Devuelve un arreglo con las citas encontradas con una respuesta de estado 200.
+   * En caso de no encontrar citas para la agenda, devuelve un estado 404.
+   * En caso de error en la consulta, envía una respuesta con estado 500 y los detalles del error.
+   */
+  async findByAgendaId(req, res) {
+    const agenda_id = req.params.agenda_id;
+    try {
+      const citas = await CitaModel.findByAgendaId(agenda_id);
+      if (citas.length === 0) {
+        return res.status(404).json({
+          mensaje: `No se encontraron citas para la agenda con ID ${agenda_id}`,
+        });
+      }
+      res.status(200).json(citas);
+    } catch (err) {
+      res.status(500).json({
+        mensaje: `Error al buscar citas por ID de la agenda ${agenda_id}`,
+        error: err.message,
+      });
+    }
+  },
+
+  /**
+   * Busca citas basándose en el nombre de la agenda. Realiza una búsqueda por coincidencia de texto en los nombres de las agendas y devuelve todas las citas que pertenecen a agendas con nombres coincidentes con el criterio de búsqueda proporcionado.
+   * En caso de no encontrar coincidencias, devuelve un estado 404.
+   * En caso de error durante la búsqueda, envía una respuesta con estado 500 y los detalles del error.
+   */
+  async findByNombreAgenda(req, res) {
+    const nombreAgenda = req.params.nombreAgenda;
+    try {
+      const citas = await CitaModel.findByNombreAgenda(nombreAgenda);
+      if (citas.length === 0) {
+        return res.status(404).json({
+          mensaje: `No se encontraron citas con el nombre de agenda '${nombreAgenda}'`,
+        });
+      }
+      res.status(200).json(citas);
+    } catch (err) {
+      res.status(500).json({
+        mensaje: `Error al buscar citas por nombre de la agenda '${nombreAgenda}'`,
+        error: err.message,
+      });
+    }
+  },
+
+  /**
+   * Actualiza los detalles de una cita específica identificada por su ID, con los datos proporcionados en el cuerpo de la solicitud HTTP. Valida los datos y verifica que la cita exista.
+   * Si la actualización es exitosa, devuelve una respuesta con estado 200 y un mensaje de éxito.
+   * En caso de no encontrar la cita, devuelve un estado 404.
+   * En caso de error durante la actualización, envía una respuesta con estado 500 y los detalles del error.
+   */
+  async updateById(req, res) {
+    const idCita = req.params.idCita;
+    const updatedData = req.body;
+    try {
+      const result = await CitaModel.updateById(idCita, updatedData);
+      if (result.affectedRows === 0) {
+        return res.status(404).json({
+          mensaje: `Cita con ID ${idCita} no encontrada o sin cambios necesarios`,
+        });
+      }
+      res.status(200).json({
+        mensaje: `Cita con ID ${idCita} actualizada exitosamente`,
+      });
+    } catch (err) {
+      res.status(500).json({
+        mensaje: `Error al actualizar la cita con ID ${idCita}`,
+        error: err.message,
+      });
+    }
+  },
+
+  /**
+   * Elimina una cita específica de la base de datos utilizando su ID. Valida que el ID proporcionado sea un número entero válido.
+   * Si la eliminación es exitosa, devuelve una respuesta con estado 200 y un mensaje de éxito.
+   * En caso de no encontrar la cita para eliminar, devuelve un estado 404.
+   * En caso de error durante la eliminación, envía una respuesta con estado 500 y los detalles del error.
+   */
+  async deleteById(req, res) {
+    const idCita = req.params.idCita;
+    try {
+      const result = await CitaModel.removeById(idCita);
+      if (result.affectedRows === 0) {
+        return res.status(404).json({
+          mensaje: `Cita con ID ${idCita} no encontrada`,
+        });
+      }
+      res.status(200).json({
+        mensaje: `Cita con ID ${idCita} eliminada exitosamente`,
+      });
+    } catch (err) {
+      res.status(500).json({
+        mensaje: `Error al eliminar la cita con ID ${idCita}`,
+        error: err.message,
+      });
+    }
+  },
 };
 
-// Exportar las funciones del controlador
-module.exports = {
-  create: exports.create,
-  findAll: exports.findAll,
-  findOne: exports.findOne,
-  findByPacienteNHC: exports.findByPacienteNHC,
-  update: exports.update,
-  delete: exports.delete,
-};
+module.exports = citaController;

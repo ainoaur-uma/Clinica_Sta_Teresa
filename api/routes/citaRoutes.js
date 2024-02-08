@@ -5,12 +5,15 @@ const router = express.Router();
 const citaController = require('../controllers/citaController');
 
 // Definición de rutas para la entidad cita:
-router.post('/', citaController.create); // Crear una nueva cita
-router.get('/', citaController.findAll); // Obtener todas las citas
-router.get('/:idCita', citaController.findOne); // Obtener una cita específica por su ID
-router.get('/paciente/:NHC_paciente', citaController.findByPacienteNHC); // Obtener citas por NHC del paciente
-router.patch('/:idCita', citaController.update); // Actualizar una cita por su ID (utilizando PATCH)
-router.delete('/:idCita', citaController.delete); // Eliminar una cita por su ID
+router.post('/', citaController.create); // Crea una nueva cita
+router.get('/', citaController.findAll); // Obtiene todas las citas
+router.get('/:idCita', citaController.findOne); // Obtiene una cita por su ID
+router.get('/paciente/:NHC_paciente', citaController.findByNhc); // Busca citas por NHC del paciente
+router.get('/doctor/:doctor_id', citaController.findByUsuarioId); // Busca citas por ID del doctor (usuario)
+router.get('/agenda/:agenda_id', citaController.findByAgendaId); // Busca citas por ID de la agenda
+router.get('/agenda/nombre/:nombreAgenda', citaController.findByNombreAgenda); // Busca citas por el nombre de la agenda
+router.patch('/:idCita', citaController.updateById); // Actualiza una cita por su ID
+router.delete('/:idCita', citaController.deleteById); // Elimina una cita por su ID
 
 // Exportar el router
 module.exports = router;
