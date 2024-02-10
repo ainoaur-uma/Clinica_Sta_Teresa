@@ -52,8 +52,8 @@ const usuarioController = {
    * se devuelve una respuesta con estado 500 y los detalles del error.
    */
   async findOne(req, res) {
+    const usuarioId = req.params.usuarioId;
     try {
-      const usuarioId = req.params.usuarioId;
       const usuario = await usuarioModel.findById(usuarioId);
       if (!usuario) {
         return res
@@ -64,6 +64,57 @@ const usuarioController = {
     } catch (err) {
       res.status(500).json({
         mensaje: `Error al obtener usuario con ID ${usuarioId}`,
+        error: err.message,
+      });
+    }
+  },
+
+  /**
+   * Este método recupera los detalles extendidos de todos los usuarios de la base de datos, incluyendo el email desde la tabla 'persona' y el nombre del rol desde la tabla 'rol'.
+   * Llama al método 'getAllWithDetails' del modelo de usuario, que ejecuta una consulta SQL para obtener todos los registros de usuarios con sus detalles extendidos.
+   * Si la consulta es exitosa y se encuentran usuarios, devuelve una respuesta con estado 200 y los datos detallados de todos los usuarios.
+   * En caso de que no se encuentren usuarios, devuelve una respuesta con estado 404 y un mensaje indicando que no se encontraron usuarios.
+   * En caso de error durante la consulta, captura la excepción, envía una respuesta con estado 500 y detalles del error.
+   */
+  async getAllUserDetails(req, res) {
+    const usuariosConDetalles = await usuarioModel.getAllWithDetails();
+    try {
+      if (usuariosConDetalles.length === 0) {
+        return res.status(404).json({ mensaje: 'No se encontraron usuarios' });
+      }
+      res.status(200).json(usuariosConDetalles);
+    } catch (err) {
+      res.status(500).json({
+        message: 'Error al obtener los detalles de todos los usuarios',
+        error: err.message,
+      });
+    }
+  },
+
+  /**
+   * Este método recupera los detalles extendidos de un usuario específico de la base de datos, incluyendo el email desde la tabla 'persona' y el nombre del rol desde la tabla 'rol'.
+   * Llama al método 'getByIdWithDetails' del modelo de usuario, que ejecuta una consulta SQL para obtener un registro de usuario con sus detalles extendidos.
+   * El método valida primero el 'idUsuario' para asegurarse de que es un entero válido.
+   * Si la consulta es exitosa y el usuario existe, devuelve una respuesta con estado 200 y los datos detallados del usuario.
+   * Si el usuario no existe, devuelve una respuesta con estado 404 y un mensaje indicando que el usuario no fue encontrado.
+   * En caso de error durante la consulta, captura la excepción, envía una respuesta con estado 500 y detalles del error.
+   * */
+  async getUserDetailsById(req, res) {
+    const usuarioId = req.params.usuarioId;
+    try {
+      const usuarioConDetalles = await usuarioModel.getByIdWithDetails(
+        usuarioId
+      );
+      if (!usuarioConDetalles) {
+        return res
+          .status(404)
+          .json({ mensaje: `Usuario con id ${usuarioId}no encontrado` });
+      }
+      res.status(200).json(usuarioConDetalles);
+    } catch (err) {
+      // Si hay un error, capturarlo y enviar una respuesta adecuada
+      res.status(500).json({
+        message: `Error al obtener los detalles del usuario con ID ${usuarioId}`,
         error: err.message,
       });
     }

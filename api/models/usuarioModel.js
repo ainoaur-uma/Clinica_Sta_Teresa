@@ -55,7 +55,7 @@ const usuarioModel = {
   },
 
   /**
-   * Este método obtiene todos los usuarios de la base de datos.
+   * Este método devuelve todos los usuarios de la base de datos.
    * En caso de error de conexión, se lanza un error específico.
    */
   async getAll() {
@@ -84,6 +84,63 @@ const usuarioModel = {
       return res[0];
     } catch (err) {
       throw new Error('Error al buscar el usuario: ' + err.message);
+    }
+  },
+
+  /**
+   * Este método devuelve una lista de todos los usuarios con sus respectivos emails y nombres de rol.
+   * Realiza una consulta SQL para obtener los detalles extendidos de cada usuario.
+   * En caso de error durante la consulta, lanza un error específico.
+   */
+  async getAllWithDetails() {
+    // Aquí no necesitamos validación Joi porque no estamos manejando parámetros de entrada
+    try {
+      const query = `
+      SELECT u.*, p.email, r.descripcion_rol AS nombreRol
+      FROM usuario u
+      JOIN persona p ON u.idUsuario = p.idPersona
+      JOIN rol r ON u.rol_usuario = r.idRol
+    `;
+      const [results] = await db.query(query);
+      if (results.length === 0) throw new Error('No se encontraron usuarios');
+      return results;
+    } catch (err) {
+      throw new Error(
+        `Error al obtener todos los usuarios con detalles: ${err.message}`
+      );
+    }
+  },
+
+  /**
+   * Este método devuelve los detalles del usuario además del email que se encuentra en la tabla persona y el nombre del rol,
+   *  buscando por su idUsuario.
+   * Utiliza validación para asegurar que el idUsuario es un número entero válido.
+   * Si no se encuentra el usuario, lanza un error especificando que el usuario no fue encontrado.
+   */
+  async getByIdWithDetails(idUsuario) {
+    // Validación del idUsuario
+    const { error } = Joi.number()
+      .integer()
+      .min(1)
+      .required()
+      .validate(idUsuario);
+    if (error) throw new Error('idUsuario proporcionado es inválido.');
+
+    try {
+      const query = `
+      SELECT u.*, p.email, r.descripcion_rol AS nombreRol
+      FROM usuario u
+      JOIN persona p ON u.idUsuario = p.idPersona
+      JOIN rol r ON u.rol_usuario = r.idRol
+      WHERE u.idUsuario = ?
+    `;
+      const [result] = await db.query(query, [idUsuario]);
+      if (result.length === 0) throw new Error('Usuario no encontrado');
+      return result[0];
+    } catch (err) {
+      throw new Error(
+        `Error al buscar el usuario con idUsuario ${idUsuario}: ${err.message}`
+      );
     }
   },
 
