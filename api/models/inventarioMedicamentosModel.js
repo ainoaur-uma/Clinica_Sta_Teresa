@@ -46,7 +46,7 @@ const InventarioMedicamentosModel = {
         'INSERT INTO inventario_medicamentos SET ?',
         value
       );
-      // Asignar el idInventario al objeto de respuesta (si tu DB lo soporta)
+      // Asignar el idInventario al objeto de respuesta
       return { idInventario: res.insertId, ...value };
     } catch (err) {
       throw new Error(
@@ -66,6 +66,36 @@ const InventarioMedicamentosModel = {
     } catch (err) {
       throw new Error(
         `Error al obtener registros de inventario: ${err.message}`
+      );
+    }
+  },
+
+  /**
+   * Este método obtiene todos los registros de inventario junto con el nombre del medicamento.
+   * Realiza un JOIN con la tabla `medicamentos` para obtener el nombre del medicamento.
+   * En caso de error durante la consulta, lanza una excepción con el mensaje de error correspondiente.
+   */
+  async getAllWithDetails() {
+    try {
+      const query = `
+      SELECT 
+      im.idInventario,
+      im.idMedicamento,
+      m.nombre_medicamento,
+      im.cantidad_actual,
+      im.fecha_registro
+    FROM 
+      inventario_medicamentos AS im
+    JOIN 
+      medicamento AS m ON im.idMedicamento = m.idMedicamento;
+    `;
+      const [results] = await db.query(query);
+      if (results.length === 0)
+        throw new Error('No se encontraron medicamentos');
+      return results;
+    } catch (err) {
+      throw new Error(
+        `Error al obtener registros de inventario con detalles: ${err.message}`
       );
     }
   },

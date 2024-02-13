@@ -154,9 +154,9 @@ const usuarioController = {
    * En caso de un error durante la actualización, se devuelve una respuesta de estado 500 con los detalles del error.
    */
   async updateById(req, res) {
+    const usuarioId = req.params.usuarioId;
+    const updatedData = req.body;
     try {
-      const usuarioId = req.params.usuarioId;
-      const updatedData = req.body;
       const result = await usuarioModel.updateById(usuarioId, updatedData);
 
       if (result.affectedRows === 0) {
@@ -172,6 +172,51 @@ const usuarioController = {
       res.status(500).json({
         mensaje: `Error al actualizar usuario con ID ${usuarioId}`,
         error: err.message,
+      });
+    }
+  },
+
+  /**
+   * Este método maneja la actualización tanto de la información de un usuario específico por su ID (idUsuario) como del email
+   * asociado en la tabla 'persona'. Los datos del usuario y el nuevo email se reciben en el cuerpo de la solicitud HTTP.
+   * Se hace una llamada al método 'updateUserAndEmail' del modelo de usuario para aplicar las actualizaciones en las
+   * bases de datos de usuario y persona simultáneamente. Si la actualización es exitosa, se devuelve una respuesta con
+   * estado 200 y un mensaje indicando el éxito de la operación.
+   * Si no se encuentra el usuario o la persona a actualizar, o si hay un error durante la actualización, se devuelve
+   * una respuesta adecuada con el mensaje y estado correspondiente.
+   */
+  async updateUsuarioAndEmail(req, res) {
+    const usuarioId = req.params.usuarioId;
+    const { nombre_usuario, rol_usuario, email } = req.body;
+
+    try {
+      const datosUsuario = {
+        nombre_usuario,
+        rol_usuario,
+      };
+
+      const resultado = await usuarioModel.updateUserAndEmail(
+        usuarioId,
+        datosUsuario,
+        email
+      );
+
+      if (
+        resultado.usuarioAffectedRows === 0 ||
+        resultado.personaAffectedRows === 0
+      ) {
+        return res.status(404).json({
+          mensaje: `No se encontró el usuario con ID ${usuarioId} o no se requirieron cambios.`,
+        });
+      }
+
+      res.status(200).json({
+        mensaje: `Usuario con ID ${usuarioId} y su email actualizados exitosamente.`,
+      });
+    } catch (error) {
+      res.status(500).json({
+        mensaje: `Error al actualizar el usuario con ID ${usuarioId} y email ${email}`,
+        error: error.message,
       });
     }
   },

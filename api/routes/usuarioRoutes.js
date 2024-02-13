@@ -12,6 +12,7 @@ router.get('/:usuarioId', usuarioController.findOne); // obtener un usuario por 
 router.get('/detalles/:usuarioId', usuarioController.getUserDetailsById); // Obtener un usuario con detalles de email y rol
 router.get('/nombre/:nombre_usuario', usuarioController.findByUsername);
 router.patch('/:usuarioId', usuarioController.updateById); //actualizar un usuario por su ID utilizando PATCH
+router.patch('/:usuarioId/email', usuarioController.updateUsuarioAndEmail); // Actualizar un usuario y su email asociado por su ID utilizando PATCH
 router.delete('/:usuarioId', usuarioController.deleteById); //eliminar un usuario por su ID
 router.get('/ordenadosPorNombre', usuarioController.getAllSortedByName);
 

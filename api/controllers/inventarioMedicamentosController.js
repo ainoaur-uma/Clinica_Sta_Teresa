@@ -1,4 +1,4 @@
-const InventarioMedicamentosModel = require('../models/InventarioMedicamentosModel');
+const InventarioMedicamentosModel = require('../models/inventarioMedicamentosModel');
 const medicamentoModel = require('../models/medicamentoModel');
 
 const InventarioMedicamentosController = {
@@ -43,6 +43,34 @@ const InventarioMedicamentosController = {
     } catch (err) {
       res.status(500).json({
         mensaje: 'Error al obtener registros de inventario',
+        error: err.message,
+      });
+    }
+  },
+
+  /**
+   * Este método recupera los detalles extendidos de todos los registros de inventario de la base de datos,
+   * incluyendo el nombre del medicamento desde la tabla 'medicamento'.
+   * Llama al método 'getAllWithDetails' del modelo de inventario, que ejecuta una consulta SQL para obtener
+   * todos los registros de inventario con sus detalles extendidos.
+   * Si la consulta es exitosa y se encuentran registros, devuelve una respuesta con estado 200 y los datos detallados.
+   * En caso de que no se encuentren registros, devuelve una respuesta con estado 404 y un mensaje indicando que no se encontraron registros.
+   * En caso de error durante la consulta, captura la excepción, envía una respuesta con estado 500 y detalles del error.
+   */
+  async getInventarioDetails(req, res) {
+    try {
+      const inventarioConDetalles =
+        await InventarioMedicamentosModel.getAllWithDetails();
+      if (inventarioConDetalles.length === 0) {
+        return res
+          .status(404)
+          .json({ mensaje: 'No se encontraron registros en el inventario' });
+      }
+      res.status(200).json(inventarioConDetalles);
+    } catch (err) {
+      res.status(500).json({
+        message:
+          'Error al obtener los detalles de todos los registros del inventario',
         error: err.message,
       });
     }

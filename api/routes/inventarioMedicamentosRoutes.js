@@ -7,6 +7,7 @@ const inventarioMedicamentosController = require('../controllers/inventarioMedic
 // Rutas para la entidad Inventario de Medicamentos
 router.post('/', inventarioMedicamentosController.create); // Crear un nuevo registro de inventario
 router.get('/', inventarioMedicamentosController.findAll); // Obtener todos los registros de inventario
+router.get('/detalles', inventarioMedicamentosController.getInventarioDetails); //Obtener todos los registros de inventario con detalles extendidos
 router.get('/:idInventario', inventarioMedicamentosController.findOne); // Obtener un registro de inventario por su ID
 router.get(
   '/medicamento/:idMedicamento',
