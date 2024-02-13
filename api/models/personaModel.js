@@ -9,7 +9,6 @@ const personaSchema = Joi.object({
   apellido1: Joi.string().max(100).required(),
   apellido2: Joi.string().max(100),
   fecha_nacimiento: Joi.date(),
-  escuela: Joi.string().max(100),
   telefono: Joi.string().max(20),
   email: Joi.string().email(),
   departamento: Joi.string().max(50),
@@ -27,12 +26,11 @@ const personaSchemaUpdate = Joi.object({
   fecha_nacimiento: Joi.date().optional(),
   escuela: Joi.string().max(100).optional(),
   telefono: Joi.string().max(20).optional(),
-  email: Joi.string().email().optional(),
   departamento: Joi.string().max(50).optional(),
   municipio: Joi.string().max(50).optional(),
   colonia: Joi.string().max(50).optional(),
   direccion: Joi.string().max(255).optional(),
-}).min(1); // Asegura que al menos un campo sea proporcionado para la actualización
+}).min(1);
 
 const personaModel = {
   /**

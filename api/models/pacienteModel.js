@@ -5,6 +5,7 @@ const personaModel = require('./personaModel');
 // Esquema de validación para la creación de un paciente
 const pacienteSchemaCreate = Joi.object({
   NHC: Joi.number().integer().required(),
+  escuela: Joi.number().integer(),
   tutor_info: Joi.string().allow('', null),
   grado: Joi.string().allow('', null).max(50),
   otra_info: Joi.string().allow('', null),
@@ -12,10 +13,11 @@ const pacienteSchemaCreate = Joi.object({
 
 // Esquema de validación para la actualización de un paciente con PATCH
 const pacienteSchemaUpdate = Joi.object({
+  escuela: Joi.number().integer(),
   tutor_info: Joi.string().allow('', null).optional(),
   grado: Joi.string().allow('', null).max(50).optional(),
   otra_info: Joi.string().allow('', null).optional(),
-}).min(1); // Asegura que al menos un campo sea proporcionado para la actualización
+}).min(1);
 
 const pacienteModel = {
   /**
@@ -55,6 +57,45 @@ const pacienteModel = {
       return res;
     } catch (err) {
       throw new Error(`Error al obtener pacientes: ${err.message}`);
+    }
+  },
+
+  /**
+   * Este método obtiene todos los pacientes junto con sus detalles extendidos de la tabla 'persona'.
+   * Realiza una consulta JOIN entre la tabla 'paciente' y la tabla 'persona' para combinar la información requerida.
+   * En caso de error durante la consulta, lanza una excepción con el mensaje de error correspondiente.
+   */
+  async getAllWithDetails() {
+    try {
+      const query = `
+      SELECT 
+          pa.NHC,
+          pe.carnet_identidad,
+          pe.nombre,
+          pe.apellido1,
+          pe.apellido2,
+          pe.fecha_nacimiento,
+          es.nombre_escuela AS escuela,  
+          pa.tutor_info,
+          pe.telefono,
+          pe.email,
+          pe.departamento,
+          pe.municipio, 
+          pe.direccion,
+          pa.otra_info,
+          pa.grado 
+      FROM paciente pa
+      JOIN persona pe ON pa.NHC = pe.idPersona
+      LEFT JOIN escuela es ON pa.escuela = es.idEscuela 
+      ORDER BY pe.apellido1, pe.apellido2, pe.nombre;
+      `;
+      const [results] = await db.query(query);
+      if (results.length === 0) throw new Error('No se encontraron pacientes');
+      return results;
+    } catch (err) {
+      throw new Error(
+        `Error al obtener los detalles de los pacientes: ${err.message}`
+      );
     }
   },
 
@@ -133,6 +174,58 @@ const pacienteModel = {
       return { affectedRows: res.affectedRows };
     } catch (err) {
       throw new Error(`Error al actualizar el paciente: ${err.message}`);
+    }
+  },
+
+  /**
+   * Actualiza de forma atómica los datos tanto en la tabla de personas como en la de pacientes.
+   * Utiliza transacciones para garantizar que ambas actualizaciones se completen con éxito o, en caso de fallo,
+   * se revierten todos los cambios para mantener la consistencia de la base de datos.
+   *Primero verifica en el body si hay datos de persona o datos de paciente para actualizar y luego los actualiza
+   */
+  async updatePersonaYPacienteConTransaccion(
+    idPersona,
+    datosPersona,
+    datosPaciente
+  ) {
+    const connection = await db.getConnection(); // Obtener una conexión del pool
+    try {
+      await connection.beginTransaction(); // Iniciar una transacción
+
+      // Verificar si datosPersona tiene propiedades antes de actualizar
+      if (Object.keys(datosPersona).length > 0) {
+        // Actualizar datos en la tabla persona solo si datosPersona no está vacío
+        const [updatePersonaResult] = await connection.query(
+          'UPDATE persona SET ? WHERE idPersona = ?',
+          [datosPersona, idPersona]
+        );
+        if (updatePersonaResult.affectedRows === 0) {
+          throw new Error(
+            'Actualización de persona fallida o sin cambios necesarios.'
+          );
+        }
+      }
+
+      // Verificar si datosPaciente tiene propiedades antes de actualizar
+      if (Object.keys(datosPaciente).length > 0) {
+        // Actualizar datos en la tabla paciente solo si datosPaciente no está vacío
+        const [updatePacienteResult] = await connection.query(
+          'UPDATE paciente SET ? WHERE NHC = ?',
+          [datosPaciente, idPersona]
+        );
+        if (updatePacienteResult.affectedRows === 0) {
+          throw new Error(
+            'Actualización de paciente fallida o sin cambios necesarios.'
+          );
+        }
+      }
+
+      await connection.commit(); // Confirmar la transacción
+    } catch (err) {
+      await connection.rollback(); // Revertir la transacción en caso de error
+      throw err; // Propagar el error para manejo externo
+    } finally {
+      connection.release(); // Devolver la conexión al pool
     }
   },
 

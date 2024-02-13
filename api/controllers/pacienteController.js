@@ -43,7 +43,29 @@ const pacienteController = {
         .json({ mensaje: 'Error al obtener pacientes', error: err.message });
     }
   },
-
+  /**
+   * Este método recupera los detalles extendidos de todos los pacientes de la base de datos,
+   * incluyendo los datos personales desde la tabla 'persona'.
+   * Llama al método 'getAllWithDetails' del modelo de pacientes, que ejecuta una consulta SQL
+   * para obtener todos los registros de pacientes con sus detalles extendidos de la tabla 'persona'.
+   * Si la consulta es exitosa y se encuentran pacientes, devuelve una respuesta con estado 200 y los datos detallados.
+   * En caso de que no se encuentren pacientes, devuelve una respuesta con estado 404 y un mensaje indicando que no se encontraron pacientes.
+   * En caso de error durante la consulta, captura la excepción, envía una respuesta con estado 500 y detalles del error.
+   */
+  async getPatientDetails(req, res) {
+    try {
+      const pacientesConDetalles = await pacienteModel.getAllWithDetails();
+      if (pacientesConDetalles.length === 0) {
+        return res.status(404).json({ mensaje: 'No se encontraron pacientes' });
+      }
+      res.status(200).json(pacientesConDetalles);
+    } catch (err) {
+      res.status(500).json({
+        mensaje: 'Error al obtener los detalles de los pacientes',
+        error: err.message,
+      });
+    }
+  },
   /**
    * Este método obtiene una paciente específico por su NHC
    * El idUsuario se obtiene de los parámetros de la solicitud HTTP.
@@ -122,6 +144,42 @@ const pacienteController = {
       res.status(500).json({
         mensaje: `Error al actualizar paciente con NHC ${NHC}`,
         error: err.message,
+      });
+    }
+  },
+
+  /**
+   * Actualiza tanto los datos personales asociados a un paciente (a través de la tabla persona) como los datos específicos del paciente.
+   * Los datos se reciben en el cuerpo de la solicitud HTTP, divididos en dos partes: datosPersona y datosPaciente.
+   * Utiliza una transacción para asegurar la integridad de la actualización.
+   * En caso de éxito, envía una respuesta confirmando la actualización.
+   * Si el paciente o la persona asociada no se encuentran, devuelve un estado 404.
+   * Cualquier error en el proceso resulta en una respuesta de estado 500 con detalles del error.
+   */
+  async updatePersonaYPaciente(req, res) {
+    const idPersona = req.params.NHC; // Asume que el NHC se pasa como parámetro de ruta
+    const { datosPersona, datosPaciente } = req.body; // Desestructura los datos recibidos en el cuerpo de la solicitud
+
+    try {
+      // Llamada al método del modelo para actualizar la persona y el paciente de manera atómica
+      await pacienteModel.updatePersonaYPacienteConTransaccion(
+        idPersona,
+        datosPersona,
+        datosPaciente
+      );
+      res.json({
+        mensaje: `Los datos del paciente con NHC ${idPersona} y los datos personales asociados han sido actualizados exitosamente.`,
+      });
+    } catch (error) {
+      if (
+        error.message.includes('Persona no encontrada') ||
+        error.message.includes('Paciente no encontrado')
+      ) {
+        return res.status(404).json({ mensaje: error.message });
+      }
+      res.status(500).json({
+        mensaje: `Error al actualizar los datos del paciente con NHC ${idPersona} y los datos personales asociados.`,
+        error: error.message,
       });
     }
   },
