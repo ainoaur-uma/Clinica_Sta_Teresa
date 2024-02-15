@@ -6,6 +6,10 @@ const pacienteController = require('../controllers/pacienteController');
 
 // Definición de rutas para la entidad de paciente:
 router.post('/', pacienteController.create); // Crear un nuevo paciente
+router.post(
+  '/createPersonaAndPatient',
+  pacienteController.createPersonaAndPatient
+); // Ruta para crear una nueva persona y paciente
 router.get('/', pacienteController.findAll); // Obtener todos los pacientes
 router.get('/listadetallada', pacienteController.getPatientDetails); // Obtener todos los pacientes con detalles extendidos
 router.get('/:NHC', pacienteController.findOne); // Obtener un paciente por su NHC

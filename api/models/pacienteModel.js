@@ -48,6 +48,58 @@ const pacienteModel = {
   },
 
   /**
+   * Crea una nueva persona y un paciente asociado en la base de datos.
+   * Primero, inserta los datos en la tabla 'persona' y luego utiliza el ID generado
+   * para insertar el paciente en la tabla 'paciente'. Utiliza una transacción
+   * para asegurar que ambas operaciones se realicen de manera atómica.
+   *
+   * @param {Object} datosPersona - Datos personales para la nueva persona.
+   * @param {Object} datosPaciente - Datos del paciente asociado.
+   * @returns {Promise<Object>} Un objeto con los IDs de la persona y el paciente creados.
+   */
+  async createPacientePersona(datosPersona, datosPaciente) {
+    const connection = await db.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      // Insertar datos en la tabla persona
+      const [personaRes] = await connection.query(
+        'INSERT INTO persona SET ?',
+        datosPersona
+      );
+      const personaId = personaRes.insertId;
+
+      // Preparar y validar datos del paciente
+      const pacienteToInsert = { ...datosPaciente, NHC: personaId };
+      const { error: pacienteError } =
+        pacienteSchemaCreate.validate(pacienteToInsert);
+      if (pacienteError) {
+        throw new Error(
+          `Validación fallida para paciente: ${pacienteError.details
+            .map((x) => x.message)
+            .join(', ')}`
+        );
+      }
+
+      // Insertar datos en la tabla paciente
+      const [pacienteRes] = await connection.query(
+        'INSERT INTO paciente SET ?',
+        pacienteToInsert
+      );
+
+      await connection.commit();
+      return { idPersona: personaId, NHC: pacienteRes.insertId };
+    } catch (err) {
+      await connection.rollback(); // Revertir la transacción en caso de error
+      throw new Error(
+        `Error al crear la persona y el paciente: ${err.message}`
+      );
+    } finally {
+      connection.release(); // Devolver la conexión al pool
+    }
+  },
+
+  /**
    * Este método obtiene todos los pacientes de la base de datos. No requiere validación de entrada.
    * En caso de error durante la consulta, lanza una excepción con el mensaje de error correspondiente.
    */
@@ -76,14 +128,14 @@ const pacienteModel = {
           pe.apellido2,
           pe.fecha_nacimiento,
           es.nombre_escuela AS escuela,  
+          pa.grado,
           pa.tutor_info,
           pe.telefono,
           pe.email,
           pe.departamento,
           pe.municipio, 
           pe.direccion,
-          pa.otra_info,
-          pa.grado 
+          pa.otra_info
       FROM paciente pa
       JOIN persona pe ON pa.NHC = pe.idPersona
       LEFT JOIN escuela es ON pa.escuela = es.idEscuela 
@@ -134,10 +186,28 @@ const pacienteModel = {
 
     try {
       const query = `
-      SELECT p.*, pa.tutor_info, pa.grado, pa.otra_info
-      FROM paciente pa
-      JOIN persona p ON pa.NHC = p.idPersona
-      WHERE pa.NHC = ?
+      SELECT 
+      pa.NHC,
+      pe.carnet_identidad,
+      pe.nombre,
+      pe.apellido1,
+      pe.apellido2,
+      pe.fecha_nacimiento,
+      es.nombre_escuela AS escuela,
+      pa.grado,
+      pa.tutor_info,
+      pe.telefono,
+      pe.email,
+      pe.departamento,
+      pe.municipio,
+      pe.colonia, 
+      pe.direccion,
+      pa.otra_info
+  FROM paciente pa
+  JOIN persona pe ON pa.NHC = pe.idPersona
+  LEFT JOIN escuela es ON pa.escuela = es.idEscuela
+  WHERE pa.NHC = ?
+  ORDER BY pe.apellido1, pe.apellido2, pe.nombre;  
     `;
       const [result] = await db.query(query, [NHC]);
       if (result.length === 0) throw new Error('Paciente no encontrado');
@@ -231,7 +301,7 @@ const pacienteModel = {
 
   /**
    * Este método elimina un paciente por su NHC tras validar que el ID sea un número entero válido.
-   * Si ek paciente no existe o no se puede eliminar, lanza un error.
+   * Si el paciente no existe o no se puede eliminar, lanza un error.
    */
 
   async remove(NHC) {

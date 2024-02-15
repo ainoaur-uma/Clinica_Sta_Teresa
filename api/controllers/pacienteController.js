@@ -28,6 +28,35 @@ const pacienteController = {
   },
 
   /**
+   * Este método crea un nuevo registro de persona y paciente de manera atómica.
+   * Recibe los datos de la persona y del paciente desde el cuerpo de la solicitud HTTP, los valida y luego los inserta en las tablas correspondientes.
+   * Si la creación es exitosa, devuelve una respuesta con estado 201 y los datos del nuevo paciente y persona creados.
+   * En caso de error, captura la excepción y envía una respuesta con estado 500 y los detalles del error.
+   */
+  async createPersonaAndPatient(req, res) {
+    const { datosPersona, datosPaciente } = req.body;
+
+    try {
+      // Intenta crear la persona y el paciente utilizando el método del modelo
+      const resultado = await pacienteModel.createPacientePersona(
+        datosPersona,
+        datosPaciente
+      );
+      res.status(201).json({
+        mensaje: 'Persona y paciente creados con éxito',
+        idPersona: resultado.idPersona,
+        NHC: resultado.NHC,
+      });
+    } catch (err) {
+      // Si ocurre un error, responde con código 500 y el mensaje de error
+      res.status(500).json({
+        mensaje: 'Error al crear la persona y el paciente',
+        error: err.message,
+      });
+    }
+  },
+
+  /**
    * Este método recupera todos los pacientesde la base de datos.Llama al método 'getAll' del pacienteModel,
    * que ejecute una consulta SQL para obtener todos los registros de pacientes.
    * Devuelve una lista de pacietes con una respuesta de estado 200.
