@@ -45,6 +45,30 @@ const citaController = {
   },
 
   /**
+   * Este método recupera todos los detalles de las citas de la base de datos,
+   * incluyendo información adicional de las tablas 'persona', 'usuario', y 'agenda'.
+   * Llama al método 'getAllWithDetails' del modelo de citas, que ejecuta una consulta SQL
+   * para obtener todos los registros de citas con sus detalles extendidos de las tablas relacionadas.
+   * Si la consulta es exitosa y se encuentran citas, devuelve una respuesta con estado 200 y los datos detallados.
+   * En caso de que no se encuentren citas, devuelve una respuesta con estado 404 y un mensaje indicando que no se encontraron citas.
+   * En caso de error durante la consulta, captura la excepción, envía una respuesta con estado 500 y detalles del error.
+   */
+  async getCitasDetails(req, res) {
+    try {
+      const citasConDetalles = await CitaModel.getAllWithDetails();
+      if (citasConDetalles.length === 0) {
+        return res.status(404).json({ mensaje: 'No se encontraron citas' });
+      }
+      res.status(200).json(citasConDetalles);
+    } catch (err) {
+      res.status(500).json({
+        mensaje: 'Error al obtener los detalles de las citas',
+        error: err.message,
+      });
+    }
+  },
+
+  /**
    * Obtiene una cita específica por su ID (idCita). El ID se obtiene de los parámetros de la solicitud HTTP.
    * Devuelve los detalles de la cita con una respuesta de estado 200 si se encuentra.
    * En caso de no encontrar la cita, devuelve un estado 404.
@@ -63,6 +87,42 @@ const citaController = {
     } catch (err) {
       res.status(500).json({
         mensaje: `Error al obtener la cita con ID ${idCita}`,
+        error: err.message,
+      });
+    }
+  },
+
+  /**
+   * Busca citas dentro de un rango de fechas especificado por los parámetros de consulta 'fechaInicio' y 'fechaFin'.
+   * Si no se especifican fechas, busca todas las citas para la semana actual.
+   * Devuelve un arreglo con las citas encontradas con una respuesta de estado 200.
+   * En caso de no encontrar citas dentro del rango especificado, devuelve un estado 404.
+   * En caso de error durante la búsqueda, envía una respuesta con estado 500 y los detalles del error.
+   */
+  async findCitasByDateRangeOrCurrentWeek(req, res) {
+    const { fechaInicio, fechaFin } = req.query;
+    try {
+      const citas = await CitaModel.findCitasByDateRangeOrCurrentWeek(
+        fechaInicio,
+        fechaFin
+      );
+      if (citas.length === 0) {
+        return res.status(404).json({
+          mensaje: `No se encontraron citas en el rango de fechas especificado${
+            fechaInicio && fechaFin
+              ? ` desde ${fechaInicio} hasta ${fechaFin}`
+              : ' para la semana actual'
+          }.`,
+        });
+      }
+      res.status(200).json(citas);
+    } catch (err) {
+      res.status(500).json({
+        mensaje: `Error al buscar citas${
+          fechaInicio && fechaFin
+            ? ` en el rango de fechas desde ${fechaInicio} hasta ${fechaFin}`
+            : ' para la semana actual'
+        }`,
         error: err.message,
       });
     }

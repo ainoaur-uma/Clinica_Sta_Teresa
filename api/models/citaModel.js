@@ -1,7 +1,10 @@
 const db = require('../../server/db_connection');
 const Joi = require('joi');
+const moment = require('moment');
 const pacienteModel = require('./pacienteModel');
 const usuarioModel = require('./usuarioModel');
+const agendaModel = require('./agendaModel');
+const personaModel = require('./personaModel');
 
 // Esquema de validación para la creación de una cita
 const citaSchema = Joi.object({
@@ -85,6 +88,39 @@ const citaModel = {
   },
 
   /**
+   * Este método obtiene todas las citas junto con detalles extendidos de las tablas 'persona', 'usuario', y 'agenda'.
+   * Realiza una consulta JOIN entre las tablas 'cita', 'persona', 'usuario' y 'agenda' para combinar la información requerida.
+   * En caso de error durante la consulta, lanza una excepción con el mensaje de error correspondiente.
+   */
+  async getAllWithDetails() {
+    const query = `
+    SELECT 
+    cita.idCita,
+    cita.fecha, 
+    cita.hora,
+    NHC_paciente as NHC_paciente,
+    persona.nombre AS nombre_paciente, 
+    persona.apellido1 AS apellido_paciente, 
+    usuario.nombre_usuario AS nombre_usuario, 
+    agenda.descripcion AS nombre_agenda
+  FROM cita
+  INNER JOIN persona ON cita.NHC_paciente = persona.idPersona
+  INNER JOIN usuario ON cita.doctor_id = usuario.idUsuario
+  INNER JOIN agenda ON cita.agenda_id = agenda.idAgenda;
+    `;
+
+    try {
+      const [citas] = await db.query(query);
+      if (citas.length === 0) throw new Error('No se encontraron citas');
+      return citas;
+    } catch (err) {
+      throw new Error(
+        `Error al obtener las citas con detalles: ${err.message}`
+      );
+    }
+  },
+
+  /**
    * Busca una cita específica por su ID(idCita)
    * Utiliza validación para asegurar que el idCita es un número entero válido antes de realizar la consulta.
    * Si la agenda es encontrada, devuelve los detalles de la entrada. Si no se encuentra, lanza un error especificando que la agenda no fue encontrada.
@@ -104,6 +140,46 @@ const citaModel = {
       return cita[0];
     } catch (err) {
       throw new Error(`Error al buscar la cita: ${err.message}`);
+    }
+  },
+
+  /**
+   * Busca citas en la base de datos entre dos fechas especificadas. Si no se proporcionan fechas, automáticamente calcula el rango de la semana actual,  busca las citas para la semana actual.
+   * Asume que la semana comienza el lunes y termina el domingo
+   * Valida las fechas si se proporcionan
+   */
+
+  async findCitasByDateRangeOrCurrentWeek(fechaInicio = null, fechaFin = null) {
+    if (!fechaInicio || !fechaFin) {
+      fechaInicio = moment().startOf('week').toDate();
+      fechaFin = moment().endOf('week').toDate();
+    } else {
+      const { error: errorInicio } = Joi.date()
+        .required()
+        .validate(fechaInicio);
+      const { error: errorFin } = Joi.date().required().validate(fechaFin);
+      if (errorInicio || errorFin) {
+        throw new Error('Las fechas proporcionadas son inválidas.');
+      }
+    }
+
+    // Asegura si  la fecha de inicio es menor o igual a la fecha de fin
+    if (moment(fechaInicio).isAfter(fechaFin)) {
+      throw new Error(
+        'La fecha de inicio debe ser anterior o igual a la fecha de fin.'
+      );
+    }
+
+    try {
+      const query = `
+        SELECT * FROM cita
+        WHERE fecha BETWEEN ? AND ?
+        ORDER BY fecha, hora;
+      `;
+      const [citas] = await db.query(query, [fechaInicio, fechaFin]);
+      return citas;
+    } catch (err) {
+      throw new Error(`Error al buscar citas: ${err.message}`);
     }
   },
 

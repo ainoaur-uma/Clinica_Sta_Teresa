@@ -72,6 +72,7 @@ const pacienteController = {
         .json({ mensaje: 'Error al obtener pacientes', error: err.message });
     }
   },
+
   /**
    * Este método recupera los detalles extendidos de todos los pacientes de la base de datos,
    * incluyendo los datos personales desde la tabla 'persona'.
@@ -95,6 +96,7 @@ const pacienteController = {
       });
     }
   },
+
   /**
    * Este método obtiene una paciente específico por su NHC
    * El idUsuario se obtiene de los parámetros de la solicitud HTTP.
