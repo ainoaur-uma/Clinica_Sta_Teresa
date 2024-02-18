@@ -138,7 +138,7 @@ const InventarioMedicamentosController = {
    * En caso de error durante la actualización, envía una respuesta con estado 500 y los detalles del error.
    */
   async updateById(req, res) {
-    const idInventario = req.params.idInventario; // Asegúrate de que este parámetro coincida con cómo lo has definido en tus rutas.
+    const idInventario = req.params.idInventario;
     const datosActualizados = req.body;
 
     try {

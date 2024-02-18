@@ -14,9 +14,10 @@ const autenticacionController = {
 
     // Validación de datos de entrada
     if (!nombre_usuario || !contrasena) {
-      return res
-        .status(400)
-        .send({ mensaje: 'Nombre de usuario y contraseña son requeridos.' });
+      return res.status(400).send({
+        error: 'CamposRequeridos',
+        mensaje: 'Nombre de usuario y contraseña son requeridos.',
+      });
     }
 
     try {
@@ -24,7 +25,10 @@ const autenticacionController = {
       const usuario = await usuarioModel.findByUsername(nombre_usuario);
 
       if (!usuario) {
-        return res.status(404).send({ mensaje: 'Usuario no encontrado.' });
+        return res.status(404).send({
+          error: 'UsuarioNoEncontrado',
+          mensaje: 'Nombre de usuario no registrado.',
+        });
       }
 
       // Verificar la contraseña
@@ -33,7 +37,11 @@ const autenticacionController = {
         usuario.contrasena
       );
       if (!contraseñaValida) {
-        return res.status(401).send({ mensaje: 'Contraseña incorrecta.' });
+        return res.status(401).send({
+          error: 'ContraseñaIncorrecta',
+          mensaje:
+            'La contraseña es incorrecta, por favor revise los datos introducidos.',
+        });
       }
 
       // Crear y firmar el token JWT
@@ -47,9 +55,11 @@ const autenticacionController = {
 
       res.status(200).send({ auth: true, token });
     } catch (error) {
-      res
-        .status(500)
-        .send({ mensaje: 'Error en el servidor.', error: error.message });
+      res.status(500).send({
+        error: 'ErrorServidor',
+        mensaje: 'Error en el servidor.',
+        detalles: error.message,
+      });
     }
   },
 };
