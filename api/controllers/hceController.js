@@ -47,19 +47,50 @@ const hceController = {
    * En caso de no encontrar la HCE para el paciente, devuelve un estado 404.
    * En caso de error en la consulta, envía una respuesta con estado 500 y los detalles del error.
    */
-  async findByNHC(req, res) {
-    const NHC_paciente = req.params.NHC_paciente;
+  async findByNHCWithDetails(req, res) {
+    const NHC_paciente = req.params.NHC_paciente; // Obtener el NHC del paciente desde los parámetros de la ruta
     try {
-      const hce = await hceModel.findByNHC(NHC_paciente);
-      if (!hce) {
+      // Llamada al nuevo método del modelo que incluye los detalles extendidos
+      const hceConDetalles = await hceModel.getByNHCWithDetails(NHC_paciente);
+      if (!hceConDetalles || hceConDetalles.length === 0) {
+        // Si no se encuentra la HCE, devolver un estado 404 con un mensaje
         return res.status(404).json({
-          mensaje: `No se encontró la HCE para el paciente con NHC ${NHC_paciente}`,
+          mensaje: `No se encontró la HCE con detalles para el paciente con NHC ${NHC_paciente}`,
         });
       }
-      res.status(200).json(hce);
+      // Si se encuentra la HCE, devolver un estado 200 con los datos de la HCE
+      res.status(200).json(hceConDetalles);
+    } catch (err) {
+      // En caso de error durante la consulta, capturar la excepción y enviar una respuesta adecuada
+      res.status(500).json({
+        mensaje: `Error al obtener la HCE con detalles para el paciente con NHC ${NHC_paciente}`,
+        error: err.message,
+      });
+    }
+  },
+
+  /**
+   * Este método recupera los detalles extendidos de la Historia Clínica Electrónica (HCE) de un paciente específico de la base de datos,
+   * incluyendo información personal desde la tabla 'persona'.
+   * Llama al método 'getByNHCWithDetails' del modelo HCE, que ejecuta una consulta SQL para obtener un registro de HCE con sus detalles extendidos.
+   * El método valida primero el 'NHC_paciente' para asegurarse de que es un entero válido.
+   * Si la consulta es exitosa y la HCE existe, devuelve una respuesta con estado 200 y los datos detallados de la HCE.
+   * Si la HCE no existe, devuelve una respuesta con estado 404 y un mensaje indicando que la HCE no fue encontrada.
+   * En caso de error durante la consulta, captura la excepción, envía una respuesta con estado 500 y detalles del error.
+   */
+  async getHceDetails(req, res) {
+    const NHC_paciente = req.params.NHC_paciente; // Captura el NHC_paciente de los parámetros
+    try {
+      const hceConDetalles = await hceModel.getByNHCWithDetails(NHC_paciente); // Pasa el NHC_paciente a la función
+      if (!hceConDetalles) {
+        return res.status(404).json({
+          mensaje: `HCE del paciente con NHC ${NHC_paciente} no encontrada`,
+        });
+      }
+      res.status(200).json(hceConDetalles);
     } catch (err) {
       res.status(500).json({
-        mensaje: `Error al obtener la HCE para el paciente con NHC ${NHC_paciente}`,
+        message: `Error al obtener los detalles de la HCE del paciente con NHC ${NHC_paciente}`,
         error: err.message,
       });
     }
@@ -114,11 +145,9 @@ const hceController = {
           mensaje: `HCE del paciente con  NHC ${NHC_paciente} no encontrada`,
         });
       }
-      res
-        .status(200)
-        .json({
-          mensaje: `HCE con NHC ${NHC_paciente} eliminada exitosamente`,
-        });
+      res.status(200).json({
+        mensaje: `HCE con NHC ${NHC_paciente} eliminada exitosamente`,
+      });
     } catch (err) {
       res.status(500).json({
         mensaje: `Error al eliminar la HCE del  NHC ${NHC_paciente}`,

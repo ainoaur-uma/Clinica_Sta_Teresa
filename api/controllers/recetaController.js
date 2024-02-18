@@ -23,29 +23,27 @@ const RecetaController = {
       } = req.body;
 
       // Verificar la existencia del paciente, medicamento y médico
-      const paciente = await pacienteModel.findByNhc(nuevaReceta.nhc_paciente);
+      const paciente = await pacienteModel.findByNhc(nhc_paciente);
       if (!paciente) {
-        throw new Error('Paciente no encontrado');
+        return res.status(404).json({ mensaje: 'Paciente no encontrado' });
       }
 
-      const medicamento = await medicamentoModel.findById(
-        nuevaReceta.id_medicamento
-      );
+      const medicamento = await medicamentoModel.findById(id_medicamento);
       if (!medicamento) {
-        throw new Error('Medicamento no encontrado');
+        return res.status(404).json({ mensaje: 'Medicamento no encontrado' });
       }
 
-      const medico = await usuarioModel.findById(nuevaReceta.id_medico);
+      const medico = await usuarioModel.findById(id_medico);
       if (!medico) {
-        throw new Error('Médico no encontrado');
+        return res.status(404).json({ mensaje: 'Médico no encontrado' });
       }
 
-      // Crear el nuevo registro de receta
+      // Crear la nueva receta
       const nuevaReceta = {
         nhc_paciente,
         id_medicamento,
         id_medico,
-        fecha_receta,
+        fecha_receta: fecha_receta || new Date(), // Asegúrate de tener una fecha por defecto si no se proporciona
         recomendaciones,
       };
 
@@ -163,20 +161,16 @@ const RecetaController = {
       const idMedicamento = req.params.idMedicamento;
       const recetas = await recetaModel.findByMedicamentoId(idMedicamento);
       if (recetas.length === 0) {
-        return res
-          .status(404)
-          .json({
-            mensaje: `No se encontraron recetas para el medicamento con ID ${idMedicamento}`,
-          });
+        return res.status(404).json({
+          mensaje: `No se encontraron recetas para el medicamento con ID ${idMedicamento}`,
+        });
       }
       res.status(200).json(recetas);
     } catch (error) {
-      res
-        .status(500)
-        .json({
-          mensaje: 'Error al buscar recetas por ID del medicamento',
-          error: error.message,
-        });
+      res.status(500).json({
+        mensaje: 'Error al buscar recetas por ID del medicamento',
+        error: error.message,
+      });
     }
   },
 

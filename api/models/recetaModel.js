@@ -6,7 +6,7 @@ const pacienteModel = require('./pacienteModel');
 const usuarioModel = require('./usuarioModel');
 
 // Esquema de validación para la creación de una receta
-const recetaSchemaCreate = Joi.object({
+const recetaSchema = Joi.object({
   nhc_paciente: Joi.number().integer().required(),
   id_medicamento: Joi.number().integer().required(),
   id_medico: Joi.number().integer().required(),
@@ -33,7 +33,7 @@ const recetaModel = {
   async create(nuevaReceta) {
     // Verificar la existencia del paciente, médico y medicamento antes de proceder
     try {
-      await pacienteModel.findById(nuevaReceta.nhc_paciente);
+      await pacienteModel.findByNhc(nuevaReceta.nhc_paciente);
     } catch (err) {
       throw new Error(
         `No existe un paciente con el NHC ${nuevaReceta.nhc_paciente}: ${err.message}`

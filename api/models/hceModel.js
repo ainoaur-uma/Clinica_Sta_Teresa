@@ -1,6 +1,7 @@
 const db = require('../../server/db_connection');
 const Joi = require('joi');
 const pacienteModel = require('./pacienteModel');
+const personaModel = require('./personaModel');
 
 // Esquema de validación para la creación de una HCE
 const hceSchema = Joi.object({
@@ -62,6 +63,41 @@ const hceModel = {
       return res;
     } catch (err) {
       throw new Error(`Error al obtener todas las HCEs: ${err.message}`);
+    }
+  },
+
+  /**
+   * Este método devuelve la hce de un paciente con datos del paciente como su nombre, apellidos y fecha de nacimiento
+   * Realiza una consulta SQL para obtener los detalles extendidos de cada paciente
+   * En caso de error durante la consulta, lanza un error específico.
+   */
+  // Asegúrate de pasar `NHC_paciente` como un argumento a la función
+  async getByNHCWithDetails(NHC_paciente) {
+    try {
+      const query = `
+      SELECT 
+             p.idPersona AS nhc, 
+             p.nombre, 
+             p.apellido1, 
+             p.apellido2, 
+             p.fecha_nacimiento,
+             hce.sexo, 
+             hce.grupo_sanguineo, 
+             hce.alergias, 
+             hce.antecedentes_clinicos
+      FROM hce
+      JOIN persona p ON hce.NHC_paciente = p.idPersona
+      WHERE p.idPersona = ?;
+      `;
+      // Asegúrate de pasar `NHC_paciente` en el arreglo de valores para la consulta
+      const [results] = await db.query(query, [NHC_paciente]);
+      if (results.length === 0)
+        throw new Error(
+          'No se encontraron registros de HCE con detalles completos.'
+        );
+      return results;
+    } catch (err) {
+      throw new Error(`Error al obtener las HCEs con detalles: ${err.message}`);
     }
   },
 

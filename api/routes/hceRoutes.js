@@ -7,7 +7,8 @@ const hceController = require('../controllers/hceController');
 // Definición de rutas para la entidad HCE:
 router.post('/', hceController.create); // Crear una nueva HCE
 router.get('/', hceController.findAll); // Obtener todas las HCEs
-router.get('/:NHC_paciente', hceController.findByNHC); // Obtener una HCE por NHC del paciente
+router.get('/detalles/:NHC_paciente', hceController.getHceDetails); // Obtener la hce con detalles del paciente
+//router.get('/:NHC_paciente', hceController.findByNHC); // Obtener una HCE por NHC del paciente
 router.patch('/:NHC_paciente', hceController.updateByNHC); // Actualizar una HCE por NHC del paciente (utilizando PATCH)
 router.delete('/:NHC_paciente', hceController.deleteByNHC); // Eliminar una HCE por NHC del paciente
 
