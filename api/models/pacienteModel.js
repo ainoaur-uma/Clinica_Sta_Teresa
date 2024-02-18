@@ -181,28 +181,21 @@ const pacienteModel = {
    */
   async findByNHCWithPersonaDetails(NHC) {
     // Validación del NHC
-    const { error } = Joi.number().integer().min(1).required().validate(NHC);
-    if (error) throw new Error('NHC proporcionado es inválido.');
-
+    const { error } = Joi.number().integer().required().validate(NHC);
+    if (error) {
+      throw new Error(
+        `Validación fallida: ${error.details.map((x) => x.message).join(', ')}`
+      );
+    }
     try {
       const query = `
       SELECT 
       pa.NHC,
-      pe.carnet_identidad,
       pe.nombre,
       pe.apellido1,
       pe.apellido2,
       pe.fecha_nacimiento,
-      es.nombre_escuela AS escuela,
-      pa.grado,
-      pa.tutor_info,
-      pe.telefono,
-      pe.email,
-      pe.departamento,
-      pe.municipio,
-      pe.colonia, 
-      pe.direccion,
-      pa.otra_info
+      es.nombre_escuela AS escuela
   FROM paciente pa
   JOIN persona pe ON pa.NHC = pe.idPersona
   LEFT JOIN escuela es ON pa.escuela = es.idEscuela
