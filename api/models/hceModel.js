@@ -76,31 +76,30 @@ const hceModel = {
     try {
       const query = `
       SELECT 
-             p.idPersona AS nhc, 
-             p.nombre, 
-             p.apellido1, 
-             p.apellido2, 
-             p.fecha_nacimiento,
-             hce.sexo, 
-             hce.grupo_sanguineo, 
-             hce.alergias, 
-             hce.antecedentes_clinicos
+        p.idPersona AS nhc, 
+        p.nombre, 
+        p.apellido1, 
+        p.apellido2, 
+        p.fecha_nacimiento,
+        hce.sexo, 
+        hce.grupo_sanguineo, 
+        hce.alergias, 
+        hce.antecedentes_clinicos
       FROM hce
       JOIN persona p ON hce.NHC_paciente = p.idPersona
       WHERE p.idPersona = ?;
       `;
-      // Asegúrate de pasar `NHC_paciente` en el arreglo de valores para la consulta
       const [results] = await db.query(query, [NHC_paciente]);
       if (results.length === 0)
         throw new Error(
           'No se encontraron registros de HCE con detalles completos.'
         );
-      return results;
+      // Devuelve el primer elemento del array (que será un objeto) si hay resultados.
+      return results[0];
     } catch (err) {
       throw new Error(`Error al obtener las HCEs con detalles: ${err.message}`);
     }
   },
-
   /**
    * Este método obtiene la Historia Clínica Electrónica (HCE) de un paciente específico por su NHC.
    * Valida que el NHC sea un número entero válido antes de realizar la consulta.

@@ -48,20 +48,22 @@ const hceController = {
    * En caso de error en la consulta, envía una respuesta con estado 500 y los detalles del error.
    */
   async findByNHCWithDetails(req, res) {
-    const NHC_paciente = req.params.NHC_paciente; // Obtener el NHC del paciente desde los parámetros de la ruta
+    const NHC_paciente = req.params.NHC_paciente;
     try {
-      // Llamada al nuevo método del modelo que incluye los detalles extendidos
       const hceConDetalles = await hceModel.getByNHCWithDetails(NHC_paciente);
-      if (!hceConDetalles || hceConDetalles.length === 0) {
-        // Si no se encuentra la HCE, devolver un estado 404 con un mensaje
+      // Dado que el modelo ahora devuelve un solo objeto, no es necesario verificar si es un array
+      res.status(200).json(hceConDetalles);
+    } catch (err) {
+      if (
+        err.message ===
+        'No se encontraron registros de HCE con detalles completos.'
+      ) {
+        // Si el error es específico para "No se encontraron registros", devolver un estado 404
         return res.status(404).json({
           mensaje: `No se encontró la HCE con detalles para el paciente con NHC ${NHC_paciente}`,
         });
       }
-      // Si se encuentra la HCE, devolver un estado 200 con los datos de la HCE
-      res.status(200).json(hceConDetalles);
-    } catch (err) {
-      // En caso de error durante la consulta, capturar la excepción y enviar una respuesta adecuada
+      // Para otros errores, enviar una respuesta de error general
       res.status(500).json({
         mensaje: `Error al obtener la HCE con detalles para el paciente con NHC ${NHC_paciente}`,
         error: err.message,
