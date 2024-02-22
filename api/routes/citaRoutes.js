@@ -7,6 +7,7 @@ const citaController = require('../controllers/citaController');
 // Definición de rutas para la entidad cita:
 router.get('/detalles', citaController.getCitasDetails); // Obtiene todas las citas con detalles extendidos
 router.get('/porFecha', citaController.findCitasByDateRangeOrCurrentWeek); // Busca citas en un rango de fechas o las citas de la semana actual si no se especifican fechas
+router.get('/citas-semana', citaController.getCitasWithDetailsForCurrentWeek); //citas semanales con detalles de pacientes y agendas
 router.post('/', citaController.create); // Crea una nueva cita
 router.get('/', citaController.findAll); // Obtiene todas las citas
 router.get('/:idCita', citaController.findOne); // Obtiene una cita por su ID

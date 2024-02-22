@@ -26,6 +26,12 @@ const citaSchemaUpdate = Joi.object({
   informacion_cita: Joi.string().allow('').optional(),
 }).min(1); // Requiere al menos un campo para la actualización
 
+// Esquema de validación para la funcion que da las citas de la semana con detalles
+const citasSemanaDetallesSchema = Joi.object({
+  fechaInicio: Joi.date().required(),
+  fechaFin: Joi.date().required().min(Joi.ref('fechaInicio')),
+});
+
 const citaModel = {
   /**
    * Crea una nueva cita en la base de datos.
@@ -98,15 +104,16 @@ const citaModel = {
     cita.idCita,
     cita.fecha, 
     cita.hora,
-    NHC_paciente as NHC_paciente,
+    cita.NHC_paciente,
     persona.nombre AS nombre_paciente, 
-    persona.apellido1 AS apellido_paciente, 
-    usuario.nombre_usuario AS nombre_usuario, 
-    agenda.descripcion AS nombre_agenda
-  FROM cita
-  INNER JOIN persona ON cita.NHC_paciente = persona.idPersona
-  INNER JOIN usuario ON cita.doctor_id = usuario.idUsuario
-  INNER JOIN agenda ON cita.agenda_id = agenda.idAgenda;
+    persona.apellido1 AS apellido1_paciente,
+    usuario.nombre_usuario,
+    agenda.descripcion AS nombre_agenda,
+    cita.informacion_cita
+FROM cita
+INNER JOIN persona ON cita.NHC_paciente = persona.idPersona
+INNER JOIN usuario ON cita.doctor_id = usuario.idUsuario
+INNER JOIN agenda ON cita.agenda_id = agenda.idAgenda;
     `;
 
     try {
@@ -180,6 +187,57 @@ const citaModel = {
       return citas;
     } catch (err) {
       throw new Error(`Error al buscar citas: ${err.message}`);
+    }
+  },
+
+  /**
+   *
+   *Este método devuelve las citas de la semana pero además también devuelve algunos detalles de otras tablas
+   * como los datos  de los pacientes citados y  el nombre de la agenda
+   */
+  async getCitasWithDetailsForCurrentWeek() {
+    // Define las fechas de inicio y fin de la semana actual
+    const fechaInicio = moment().startOf('week').format('YYYY-MM-DD');
+    const fechaFin = moment().endOf('week').format('YYYY-MM-DD');
+
+    // Validar las fechas con el esquema de Joi
+    const { error } = citasSemanaDetallesSchema.validate({
+      fechaInicio,
+      fechaFin,
+    });
+    if (error) {
+      throw new Error(
+        `Error de validación: ${error.details.map((x) => x.message).join(', ')}`
+      );
+    }
+    const query = `
+      SELECT 
+        cita.idCita,
+        cita.fecha, 
+        cita.hora,
+        cita.NHC_paciente,
+        persona.nombre AS nombre_paciente, 
+        persona.apellido1 AS apellido1_paciente,
+        usuario.nombre_usuario,
+        agenda.descripcion AS nombre_agenda,
+        cita.informacion_cita
+      FROM cita
+      INNER JOIN persona ON cita.NHC_paciente = persona.idPersona
+      INNER JOIN usuario ON cita.doctor_id = usuario.idUsuario
+      INNER JOIN agenda ON cita.agenda_id = agenda.idAgenda
+      WHERE cita.fecha BETWEEN ? AND ?
+      ORDER BY cita.fecha, cita.hora;
+    `;
+
+    try {
+      const [citas] = await db.query(query, [fechaInicio, fechaFin]);
+      if (citas.length === 0)
+        throw new Error('No se encontraron citas para la semana actual.');
+      return citas;
+    } catch (err) {
+      throw new Error(
+        `Error al obtener las citas con detalles para la semana actual: ${err.message}`
+      );
     }
   },
 

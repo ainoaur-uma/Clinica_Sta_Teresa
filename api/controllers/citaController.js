@@ -129,6 +129,37 @@ const citaController = {
   },
 
   /**
+   * Este método recupera todas las citas de la semana actual junto con detalles extendidos
+   * de las tablas 'persona', 'usuario' y 'agenda'.
+   * Llama al método 'getCitasWithDetailsForCurrentWeek' del modelo de citas, que ejecuta
+   * una consulta SQL para obtener todas las citas con detalles para la semana actual.
+   * Si la consulta es exitosa y se encuentran citas, devuelve una respuesta con estado 200
+   * y los datos detallados.
+   * En caso de que no se encuentren citas, devuelve una respuesta con estado 404 y un mensaje
+   * indicando que no se encontraron citas para la semana actual.
+   * En caso de error durante la consulta, captura la excepción y envía una respuesta con estado 500
+   * y detalles del error.
+   */
+  async getCitasWithDetailsForCurrentWeek(req, res) {
+    try {
+      const citasConDetalles =
+        await CitaModel.getCitasWithDetailsForCurrentWeek();
+      if (citasConDetalles.length === 0) {
+        return res
+          .status(404)
+          .json({ mensaje: 'No se encontraron citas para la semana actual.' });
+      }
+      res.status(200).json(citasConDetalles);
+    } catch (err) {
+      res.status(500).json({
+        mensaje:
+          'Error al obtener las citas con detalles para la semana actual.',
+        error: err.message,
+      });
+    }
+  },
+
+  /**
    * Busca todas las citas de un paciente específico por su NHC. Valida que el NHC sea un número entero válido.
    * Si se encuentran citas, devuelve un arreglo con estas con una respuesta de estado 200.
    * En caso de no encontrar citas para el paciente, devuelve un estado 404.

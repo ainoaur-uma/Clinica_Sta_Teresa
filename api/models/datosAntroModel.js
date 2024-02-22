@@ -5,23 +5,24 @@ const Joi = require('joi');
 const datosAntropometricosSchema = Joi.object({
   NHC_paciente: Joi.number().integer().required(),
   fecha_registro: Joi.date().required(),
-  peso: Joi.number().precision(2).optional(),
-  altura: Joi.number().precision(2).optional(),
-  IMC: Joi.number().precision(2).optional(),
-  circunferencia_cintura: Joi.number().precision(2).optional(),
-  circunferencia_cadera: Joi.number().precision(2).optional(),
-  circunferencia_cabeza: Joi.number().precision(2).optional(),
+  peso: Joi.number().precision(2).allow(null).optional(),
+  altura: Joi.number().precision(2).allow(null).optional(),
+  IMC: Joi.number().precision(2).allow(null).optional(),
+  circunferencia_cintura: Joi.number().precision(2).allow(null).optional(),
+  circunferencia_cadera: Joi.number().precision(2).allow(null).optional(),
+  circunferencia_cabeza: Joi.number().precision(2).allow(null).optional(),
 });
 
 // Esquema de validación para la actualización parcial con PATCH
 const datosAntropometricosSchemaUpdate = Joi.object({
-  peso: Joi.number().precision(2).optional(),
-  altura: Joi.number().precision(2).optional(),
-  IMC: Joi.number().precision(2).optional(),
-  circunferencia_cintura: Joi.number().precision(2).optional(),
-  circunferencia_cadera: Joi.number().precision(2).optional(),
-  circunferencia_cabeza: Joi.number().precision(2).optional(),
-  fecha_registro: Joi.date().optional(),
+  NHC_paciente: Joi.number().integer().required(),
+  fecha_registro: Joi.date().required(),
+  peso: Joi.number().precision(2).allow(null).optional(),
+  altura: Joi.number().precision(2).allow(null).optional(),
+  IMC: Joi.number().precision(2).allow(null).optional(),
+  circunferencia_cintura: Joi.number().precision(2).allow(null).optional(),
+  circunferencia_cadera: Joi.number().precision(2).allow(null).optional(),
+  circunferencia_cabeza: Joi.number().precision(2).allow(null).optional(),
 }).min(1); // Asegura que al menos un campo sea proporcionado para la actualización
 
 const datosAntropometricosModel = {

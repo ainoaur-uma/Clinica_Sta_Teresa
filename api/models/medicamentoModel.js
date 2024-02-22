@@ -7,7 +7,6 @@ const medicamentoSchema = Joi.object({
   principio_activo: Joi.string().max(100).optional(),
   descripcion_medicamento: Joi.string().optional(),
   fecha_caducidad: Joi.date().optional(),
-  forma_dispensacion: Joi.string().max(50).optional(),
 });
 
 // Esquema de validación para la actualización parcial con PATCH
@@ -16,7 +15,6 @@ const medicamentoSchemaUpdate = Joi.object({
   principio_activo: Joi.string().max(100).optional(),
   descripcion_medicamento: Joi.string().optional(),
   fecha_caducidad: Joi.date().optional(),
-  forma_dispensacion: Joi.string().max(50).optional(),
 }).min(1); // Requiere al menos un campo para la actualización
 
 const medicamentoModel = {

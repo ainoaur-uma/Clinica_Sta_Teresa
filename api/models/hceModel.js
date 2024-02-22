@@ -76,7 +76,7 @@ const hceModel = {
     try {
       const query = `
       SELECT 
-        p.idPersona AS nhc, 
+        p.idPersona AS NHC_paciente, 
         p.nombre, 
         p.apellido1, 
         p.apellido2, 

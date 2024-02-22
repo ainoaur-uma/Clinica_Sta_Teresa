@@ -11,13 +11,14 @@ const episodioSchema = Joi.object({
   anamnesis: Joi.string().optional(),
   diagnostico: Joi.string().optional(),
   tratamiento: Joi.string().optional(),
-  peso: Joi.number().precision(2).optional(),
-  pa: Joi.number().precision(2).optional(),
-  spo2: Joi.number().precision(2).optional(),
+  peso: Joi.number().precision(2).allow(null).optional(),
+  pa: Joi.number().precision(2).allow(null).optional(),
+  spo2: Joi.number().precision(2).allow(null).optional(),
 });
 
 // Esquema de validación para actualización parcial con PATCH
 const episodioSchemaUpdate = Joi.object({
+  NHC_paciente: Joi.number().integer().required(),
   Medico: Joi.number().integer().optional(),
   fecha_episodio: Joi.date().optional(),
   tipo_asistencia: Joi.string().max(20).optional(),
@@ -25,9 +26,9 @@ const episodioSchemaUpdate = Joi.object({
   anamnesis: Joi.string().optional(),
   diagnostico: Joi.string().optional(),
   tratamiento: Joi.string().optional(),
-  peso: Joi.number().precision(2).optional(),
-  pa: Joi.number().precision(2).optional(),
-  spo2: Joi.number().precision(2).optional(),
+  peso: Joi.number().precision(2).allow(null).optional(),
+  pa: Joi.number().precision(2).allow(null).optional(),
+  spo2: Joi.number().precision(2).allow(null).optional(),
 }).min(1); // Requiere al menos un campo para la actualización
 
 const episodioModel = {
